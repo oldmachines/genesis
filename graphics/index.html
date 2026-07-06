@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Genesis Graphics — the VDP, planes &amp; sprites</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%23ff5347%27/%3E%3Crect x=%276%27 y=%278%27 width=%2720%27 height=%275%27 rx=%272%27 fill=%27%230a0b10%27/%3E%3C/svg%3E">
+<meta name="description" content="A hands-on course in three parts: 2D graphics fundamentals from scratch, how the Sega Genesis VDP draws a frame from tiles, planes and sprites, and how emulators like Genesis Plus GX and BlastEm reproduce it — with live software-rendered labs so you can see every concept.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="progress" aria-hidden="true"><div class="fill" id="progress-fill"></div></div>
+<button class="menu-btn" id="menu-btn" aria-label="Open contents">☰</button>
+<div class="scrim" id="scrim"></div>
+
+<div class="app">
+
+  <!-- ================================================= SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Genesis Graphics</h1>
+        <span class="sub">A course · 16 modules</span>
+      </div>
+    </div>
+
+    <nav class="toc" aria-label="Course contents">
+      <div class="toc-group">Part I · 2D graphics fundamentals</div>
+      <a href="#pixels"><span class="n">01</span><span>Pictures as pixels</span></a>
+      <a href="#tiles"><span class="n">02</span><span>Tiles &amp; patterns</span></a>
+      <a href="#palettes"><span class="n">03</span><span>Palettes &amp; colour</span></a>
+      <a href="#nametable"><span class="n">04</span><span>Nametables &amp; the tilemap</span></a>
+      <a href="#scroll"><span class="n">05</span><span>Scrolling</span></a>
+      <a href="#sprites"><span class="n">06</span><span>Sprites</span></a>
+
+      <div class="toc-group">Part II · The Sega VDP</div>
+      <a href="#vdp"><span class="n">07</span><span>Meet the VDP</span></a>
+      <a href="#memory"><span class="n">08</span><span>VRAM, CRAM &amp; VSRAM</span></a>
+      <a href="#planes"><span class="n">09</span><span>Planes A, B &amp; the window</span></a>
+      <a href="#sprite-engine"><span class="n">10</span><span>The sprite engine &amp; its limits</span></a>
+      <a href="#raster"><span class="n">11</span><span>Scroll modes &amp; raster effects</span></a>
+      <a href="#shadow"><span class="n">12</span><span>Shadow, highlight &amp; tricks</span></a>
+      <a href="#dma"><span class="n">13</span><span>DMA &amp; the display pipeline</span></a>
+
+      <div class="toc-group">Part III · Emulating the VDP</div>
+      <a href="#scanline"><span class="n">14</span><span>Scanline rendering</span></a>
+      <a href="#hardparts"><span class="n">15</span><span>The hard parts</span></a>
+      <a href="#try"><span class="n">16</span><span>Try it in an emulator</span></a>
+
+      <div class="progress-note">Progress · <b id="pct">0%</b></div>
+    </nav>
+  </aside>
+
+  <!-- ================================================= MAIN =============== -->
+  <main class="main">
+
+    <!-- ------------------------------------------------ HERO -------------- -->
+    <header class="hero">
+      <canvas id="hero-gfx" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <div class="inner">
+          <span class="eyebrow">An interactive course · Genesis Plus GX &amp; BlastEm</span>
+          <h2>How the <span class="grad">Genesis</span> drew worlds.</h2>
+          <p class="lede">
+            We start from the very beginning — what a digital picture even
+            <em>is</em> — assuming you know nothing about computer graphics. Once
+            the vocabulary is solid, we follow a frame through Sega's remarkable
+            Video Display Processor: tiles, palettes, planes and sprites, drawn a
+            scanline at a time. Then we watch how emulators reproduce it. Sixteen
+            modules, each with <strong>live, software-rendered labs</strong> so
+            you can paint, scroll and break every idea, not just read it. No game
+            artwork ships with this page; every image is drawn procedurally in
+            your browser.
+          </p>
+          <div class="cta-row">
+            <a class="btn primary" href="#pixels">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Begin Part I
+            </a>
+            <a class="btn" href="#planes">Skip ahead: the planes ✦</a>
+          </div>
+
+          <div class="arc-cards">
+            <a class="arc" href="#part-1">
+              <div class="an">PART I</div>
+              <h4>2D graphics fundamentals</h4>
+              <p>Pixels, 8×8 tiles, indexed palettes, tilemaps, scrolling and sprites — the universal vocabulary of 2D console graphics, explained from zero.</p>
+              <div class="cnt">6 modules · with labs</div>
+            </a>
+            <a class="arc" href="#part-2">
+              <div class="an">PART II</div>
+              <h4>The Sega VDP</h4>
+              <p>The 315-5313 chip, its three memories, planes A/B and the window, the sprite engine's hard limits, raster effects, and shadow/highlight.</p>
+              <div class="cnt">7 modules · with labs</div>
+            </a>
+            <a class="arc" href="#part-3">
+              <div class="an">PART III</div>
+              <h4>Emulating the VDP</h4>
+              <p>Rendering a frame scanline by scanline, the genuinely hard parts of accuracy and timing, and how to see it all in a real emulator.</p>
+              <div class="cnt">3 modules · with a lab</div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+
+      <!-- ============================================ PART I ============== -->
+      <section class="part" id="part-1">
+        <div class="part-inner">
+          <div class="kicker">Part I</div>
+          <h3>2D graphics fundamentals</h3>
+          <p>
+            This first part is pure fundamentals — nothing about any specific
+            chip yet. It's the toolkit that <em>every</em> 2D console is built
+            from: pixels, tiles, palettes, tilemaps, scrolling and sprites. We
+            build the vocabulary one word at a time, and you can paint and drag
+            each idea in a live lab. If a term is ever used before it's
+            explained, that's a bug; tell us. Everything in Parts II and III is
+            just these six ideas wired into silicon.
+          </p>
+          <div class="part-meta"><span>Modules <b>01–06</b></span><span>Difficulty <b>Absolute beginner</b></span><span>Labs <b>6 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 01 --- -->
+      <section class="doc" id="pixels">
+        <div class="mod-head">
+          <span class="eye">Module 01 <span class="part-tag">· Part I</span></span>
+          <h3>Pictures as pixels</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand, from scratch, how a picture on a screen becomes a grid of numbers a computer can store and change.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Let's start with what a picture on a screen physically is. Lean in
+            close to any display — a phone, or the family CRT the Genesis was
+            plugged into — and the image falls apart into a grid of tiny glowing
+            dots. Each dot is a <strong>pixel</strong> (from &ldquo;picture
+            element&rdquo;), and it can show exactly one colour at a time. Step
+            back and your eye fuses the grid into a smooth image. That's all a
+            digital picture is: a rectangular grid of single-colour dots.
+          </p>
+          <p>
+            To put a picture inside a computer, we need a way to write one colour
+            as numbers. The trick — borrowed from your own eyes, which sense
+            colour with three kinds of cone cell — is to describe every colour as
+            a mix of <strong>red, green and blue</strong> light. Three numbers,
+            each from 0 (none) to 255 (full), and any colour on screen falls out:
+            <code>(255,&nbsp;0,&nbsp;0)</code> is pure red,
+            <code>(255,&nbsp;255,&nbsp;255)</code> is white,
+            <code>(0,&nbsp;0,&nbsp;0)</code> is black. This scheme is
+            <span class="term" data-tip="Describing a colour as three numbers: how much Red, Green and Blue light to mix. Usually 0–255 per channel.">RGB</span>,
+            and each number is a <strong>channel</strong>. (Module 03 shows the
+            Genesis storing colour far more thriftily than this — but the idea is
+            the same.)
+          </p>
+          <p>
+            String it together: one picture = a grid of pixels; one pixel = three
+            numbers. So a whole picture is a long, ordered list of numbers, row
+            after row. The block of memory holding that list for the image on
+            screen has a name you'll hear all course: the
+            <span class="term" data-tip="The region of memory holding the colour numbers for every pixel of the image being shown — the picture, as numbers.">framebuffer</span>.
+            Draw into the framebuffer and you've drawn onto the screen. The
+            <strong>resolution</strong> is the grid's size — and on 1988 hardware,
+            every pixel cost precious memory, which is exactly why the Genesis
+            almost never stores pictures pixel-by-pixel. It stores
+            <em>tiles</em>. That's Module 02.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A mosaic</span>
+            <p>
+              A mosaic portrait is thousands of small single-colour tiles. Up
+              close: coloured squares. Across the room: a face. A
+              <span class="term" data-tip="One dot of a digital image; it shows a single colour.">pixel</span>
+              grid is a mosaic you can repaint sixty times a second — and the
+              <span class="term" data-tip="The memory holding every pixel's colour numbers for the current image.">framebuffer</span>
+              is the numbered order sheet saying which tile goes where.
+            </p>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 250" role="img" aria-label="A small pixel grid with one pixel magnified into its three RGB numbers">
+              <rect x="70" y="24" width="180" height="180" fill="#3a6bb0"/>
+              <rect x="160" y="42" width="36" height="36" fill="#ffc44d"/>
+              <rect x="196" y="42" width="36" height="36" fill="#ffc44d"/>
+              <rect x="70" y="150" width="180" height="54" fill="#2a9a5e"/>
+              <rect x="106" y="96" width="36" height="36" fill="#ff5347"/>
+              <g class="d-grid">
+                <line x1="106" y1="24" x2="106" y2="204"/><line x1="142" y1="24" x2="142" y2="204"/>
+                <line x1="178" y1="24" x2="178" y2="204"/><line x1="214" y1="24" x2="214" y2="204"/>
+                <line x1="70" y1="60" x2="250" y2="60"/><line x1="70" y1="96" x2="250" y2="96"/>
+                <line x1="70" y1="132" x2="250" y2="132"/><line x1="70" y1="168" x2="250" y2="168"/>
+              </g>
+              <rect x="70" y="24" width="180" height="180" fill="none" class="d-axis"/>
+              <rect x="106" y="96" width="36" height="36" fill="none" stroke="#3fb5ff" stroke-width="2.5"/>
+              <line x1="142" y1="96" x2="470" y2="44" class="d-stem"/>
+              <line x1="142" y1="132" x2="470" y2="214" class="d-stem"/>
+              <rect x="470" y="44" width="170" height="170" fill="#ff5347" rx="8"/>
+              <rect x="470" y="44" width="170" height="170" fill="none" class="d-axis" rx="8"/>
+              <rect x="676" y="58" width="150" height="40" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.4"/>
+              <text x="692" y="83" class="d-val" style="fill:#ff5f5a">R = 255</text>
+              <rect x="676" y="110" width="150" height="40" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.4"/>
+              <text x="692" y="135" class="d-val" style="fill:#5fd18b">G = 83</text>
+              <rect x="676" y="162" width="150" height="40" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.4"/>
+              <text x="692" y="187" class="d-val" style="fill:#5aa8ff">B = 71</text>
+              <text x="70" y="18" class="d-tag d-blue">a raster image</text>
+              <text x="470" y="34" class="d-tag d-gold">one pixel, magnified</text>
+              <text x="676" y="48" class="d-sub">…is just three numbers</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Pictures as numbers.</strong> An image is a grid of <strong>pixels</strong>; each pixel is three <span class="term" data-tip="One of the three numbers (R, G or B) making up a pixel's colour.">channel</span> values. Store the whole grid in memory and you have a <strong>framebuffer</strong> — change a number, and a dot on screen changes colour.</figcaption>
+          </figure>
+
+          <p>
+            Play with the idea below. The little scene is repainted from scratch
+            at whatever grid size you pick — drag the resolution from a chunky
+            8&nbsp;×&nbsp;8 up and watch detail appear as pixels shrink. Then
+            switch off channels: with only R lit, you're literally seeing one
+            third of the framebuffer's numbers. Hover any pixel to read its three
+            values.
+          </p>
+
+          <div class="lab" id="lab-pixel">
+            <div class="lab-head"><span class="dot"></span><span class="title">Pixel lab — an image is a grid of numbers</span><span class="badge">Canvas · live</span></div>
+            <div class="lab-body">
+              <canvas class="gfx" aria-label="A procedurally drawn scene rendered at an adjustable pixel-grid resolution"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Resolution — <span class="val" data-res-val>64 × 64</span></label>
+                  <input type="range" min="3" max="8" value="6" step="1" data-res aria-label="Resolution (power of two)">
+                </div>
+                <div class="ctrl">
+                  <label>Channels</label>
+                  <div class="chan-btns" role="group" aria-label="Colour channels">
+                    <button class="on" data-ch="r" aria-label="Red channel">R</button>
+                    <button class="on" data-ch="g" aria-label="Green channel">G</button>
+                    <button class="on" data-ch="b" aria-label="Blue channel">B</button>
+                  </div>
+                </div>
+              </div>
+              <div class="lab-readout" data-pix-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A digital image is a grid of pixels; each pixel is one colour, classically three RGB numbers.</li>
+              <li>The framebuffer is the memory holding those numbers for the on-screen image.</li>
+              <li>Resolution = the grid's size; more pixels means finer detail and more memory.</li>
+              <li>Storing whole pictures pixel-by-pixel was too costly in 1988 — the Genesis stores small reusable <em>tiles</em> instead (Module 02).</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a class="disabled" aria-disabled="true"><span class="dir">← Prev</span><span class="ttl">Start of course</span></a>
+            <a class="next" href="#tiles"><span class="dir">Next →</span><span class="ttl">02 · Tiles &amp; patterns</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 02 --- -->
+      <section class="doc" id="tiles">
+        <div class="mod-head">
+          <span class="eye">Module 02 <span class="part-tag">· Part I</span></span>
+          <h3>Tiles &amp; patterns</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See why 2D consoles never store full pictures — they store tiny 8×8 patterns and reuse them thousands of times — and how one tile is packed into memory.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Module 01 ended with a warning: a whole-screen framebuffer is
+            expensive. A 320&nbsp;×&nbsp;224 picture at even one byte per pixel is
+            about 70&nbsp;KB, and the Genesis has only <strong>64&nbsp;KB of video
+            memory</strong> for <em>everything</em>. Storing the screen as loose
+            pixels simply doesn't fit. So the machine does what a bricklayer does:
+            it builds big pictures out of small, reusable units. That unit is the
+            <span class="term" data-tip="An 8×8-pixel graphic — the atom of every Genesis background and sprite. Also called a 'pattern' or 'cell'. Stored once, reused anywhere.">tile</span>
+            (Sega's manuals call it a <em>pattern</em>, or a <em>cell</em>): a
+            fixed <strong>8&nbsp;×&nbsp;8</strong> square of pixels.
+          </p>
+          <p>
+            A tile is stored once in memory and referenced from many places on
+            screen. A brick wall isn't 40 different pictures of bricks — it's one
+            brick tile, placed a few hundred times. This reuse is the whole reason
+            2D consoles could show rich screens in tiny memory, and every idea in
+            Part I builds on it.
+          </p>
+          <p>
+            Now, how many bits does one pixel of a tile take? Not 24. A Genesis
+            tile pixel is <strong>4 bits</strong> — a
+            <span class="term" data-tip="Bits per pixel. 4bpp means each pixel is a 4-bit number, 0–15 — an index into a 16-colour palette, not a colour itself.">4bpp</span>
+            number from 0 to 15. That's not enough to name a colour directly, so
+            it doesn't: the 4-bit value is an <strong>index</strong> into a list
+            of 16 colours (the <em>palette</em>, Module 03). Index 0 is special —
+            it means &ldquo;transparent&rdquo;, letting whatever is behind show
+            through. Count the memory: 64 pixels × 4 bits = 256 bits =
+            <strong>32 bytes</strong> per tile. In 64&nbsp;KB of VRAM you can hold
+            around 2,000 unique tiles — a whole game's worth of building blocks.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A rubber-stamp kit</span>
+            <p>
+              A tile is a rubber stamp. You carve a small design once, then press
+              it onto the page wherever you want — a hundred identical bricks from
+              one stamp, cheap as ink. The Genesis screen is a page stamped from a
+              tray of a few hundred
+              <span class="term" data-tip="8×8-pixel reusable graphics — the stamps a Genesis picture is built from.">tiles</span>;
+              the trick is choosing stamps that recombine into everything a level
+              needs.
+            </p>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 220" role="img" aria-label="An 8x8 tile of 4-bit indices packs into 32 bytes and is reused across the screen">
+              <text x="30" y="26" class="d-tag d-red">one 8×8 tile · 4 bits per pixel</text>
+              <g>
+                <rect x="30" y="38" width="150" height="150" class="d-fill-panel d-stroke-line" stroke-width="1.4"/>
+                <g class="d-grid">
+                  <line x1="30" y1="56.75" x2="180" y2="56.75"/><line x1="30" y1="75.5" x2="180" y2="75.5"/><line x1="30" y1="94.25" x2="180" y2="94.25"/><line x1="30" y1="113" x2="180" y2="113"/><line x1="30" y1="131.75" x2="180" y2="131.75"/><line x1="30" y1="150.5" x2="180" y2="150.5"/><line x1="30" y1="169.25" x2="180" y2="169.25"/>
+                  <line x1="48.75" y1="38" x2="48.75" y2="188"/><line x1="67.5" y1="38" x2="67.5" y2="188"/><line x1="86.25" y1="38" x2="86.25" y2="188"/><line x1="105" y1="38" x2="105" y2="188"/><line x1="123.75" y1="38" x2="123.75" y2="188"/><line x1="142.5" y1="38" x2="142.5" y2="188"/><line x1="161.25" y1="38" x2="161.25" y2="188"/>
+                </g>
+              </g>
+              <text x="220" y="26" class="d-tag d-blue">as 4-bit indices</text>
+              <g class="d-num" style="font-size:11px">
+                <text x="220" y="60">3 3 3 3 3 3 3 3</text>
+                <text x="220" y="82">0 7 7 7 7 7 7 0</text>
+                <text x="220" y="104">3 7 7 7 7 7 7 0</text>
+                <text x="220" y="126">3 3 3 3 3 3 3 3</text>
+              </g>
+              <text x="220" y="164" class="d-sub">64 indices × 4 bits = 256 bits</text>
+              <text x="220" y="182" class="d-sub" style="fill:#ffc44d">= 32 bytes in VRAM</text>
+              <text x="470" y="26" class="d-tag">reused across the screen</text>
+              <g>
+                <rect x="470" y="42" width="360" height="150" class="d-fill-ground d-stroke-line" stroke-width="1.2"/>
+                <g id="stamp"></g>
+              </g>
+              <g fill="#ff5347">
+                <rect x="482" y="54" width="30" height="30"/><rect x="514" y="54" width="30" height="30"/><rect x="546" y="54" width="30" height="30"/><rect x="578" y="54" width="30" height="30"/><rect x="610" y="54" width="30" height="30"/><rect x="642" y="54" width="30" height="30"/><rect x="674" y="54" width="30" height="30"/><rect x="706" y="54" width="30" height="30"/><rect x="738" y="54" width="30" height="30"/><rect x="770" y="54" width="30" height="30"/>
+                <rect x="482" y="150" width="30" height="30"/><rect x="514" y="150" width="30" height="30"/><rect x="546" y="150" width="30" height="30"/><rect x="578" y="150" width="30" height="30"/><rect x="610" y="150" width="30" height="30"/><rect x="642" y="150" width="30" height="30"/><rect x="674" y="150" width="30" height="30"/><rect x="706" y="150" width="30" height="30"/><rect x="738" y="150" width="30" height="30"/><rect x="770" y="150" width="30" height="30"/>
+              </g>
+              <text x="486" y="122" class="d-sub">one stored tile, stamped many times — the picture costs almost no extra memory</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The atom of the picture.</strong> An 8×8 tile is 64 four-bit indices — <strong>32 bytes</strong>. Stored once, it is referenced anywhere on screen. A wall of a hundred bricks costs one tile plus a hundred tiny references (Module 04).</figcaption>
+          </figure>
+
+          <p>
+            The lab is a real 8×8 tile editor. Pick one of the 16 palette indices
+            and paint the grid; watch the tile repeat seamlessly on the right —
+            exactly what happens when the same pattern is placed across a
+            background. Index&nbsp;0 (the checkered swatch) stays transparent.
+            You've just authored 32 bytes of VRAM.
+          </p>
+
+          <div class="lab" id="lab-tile">
+            <div class="lab-head"><span class="dot"></span><span class="title">Tile lab — paint one 8×8 pattern</span><span class="badge">Canvas · paint</span></div>
+            <div class="lab-body">
+              <canvas class="gfx tall paint" aria-label="Editable 8x8 tile with a tiled preview"></canvas>
+              <div class="controls" style="align-items:flex-start">
+                <div class="ctrl" style="flex:1 1 260px">
+                  <label>Palette line — 16 colours (click to select)</label>
+                  <div class="swatches" data-tile-pal></div>
+                </div>
+                <div class="ctrl">
+                  <label>Presets</label>
+                  <div class="seg-btns" data-tile-preset role="group" aria-label="Tile presets">
+                    <button data-p="blank">clear</button>
+                    <button data-p="face">face</button>
+                    <button data-p="brick">brick</button>
+                    <button data-p="grass">grass</button>
+                    <button data-p="gold">coin</button>
+                  </div>
+                </div>
+              </div>
+              <div class="lab-readout" data-tile-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The Genesis builds every picture from reusable 8×8 <em>tiles</em> (patterns / cells), not a full framebuffer.</li>
+              <li>Each tile pixel is 4 bits (4bpp) — an index 0–15 into a 16-colour palette, not a colour itself. Index 0 = transparent.</li>
+              <li>One tile is 64 × 4 bits = 32 bytes; 64 KB of VRAM holds roughly 2,000 unique tiles.</li>
+              <li>Reuse is the whole game: rich screens fit in tiny memory because the same stamp appears everywhere.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#pixels"><span class="dir">← Prev</span><span class="ttl">01 · Pictures as pixels</span></a>
+            <a class="next" href="#palettes"><span class="dir">Next →</span><span class="ttl">03 · Palettes &amp; colour</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 03 --- -->
+      <section class="doc" id="palettes">
+        <div class="mod-head">
+          <span class="eye">Module 03 <span class="part-tag">· Part I</span></span>
+          <h3>Palettes &amp; colour</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn indexed colour — how a 4-bit tile pixel becomes a real colour through a palette — and exactly how the Genesis encodes its 512 possible colours.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Module 02 left a gap: a tile pixel is a number 0–15, but a number
+            isn't a colour. The bridge is a <strong>palette</strong> — a little
+            lookup table. Entry 0 holds one colour, entry 1 another, up to entry
+            15. A tile pixel of value 6 means &ldquo;whatever colour sits in slot
+            6.&rdquo; This is <span class="term" data-tip="Storing each pixel as a small index into a shared colour table, instead of a full RGB value. Cheap pixels, and you can recolour a whole image by changing the table.">indexed colour</span>,
+            and it is the beating heart of retro graphics. Two payoffs fall out
+            immediately: pixels stay tiny (4 bits, not 24), and you can recolour
+            an entire tile — day to night, hero's palette swap — by changing 16
+            table entries instead of every pixel.
+          </p>
+          <p>
+            The Genesis keeps its palettes in a dedicated 128-byte memory called
+            <span class="term" data-tip="Colour RAM — the VDP's 128-byte palette store holding 64 colour entries, arranged as 4 lines of 16.">CRAM</span>,
+            holding <strong>64 colour entries</strong> total, arranged as
+            <strong>4 lines of 16</strong>. Any given tile picks <em>one</em> of
+            those four lines (Module 04), so a tile always sees 16 colours — but
+            different tiles can point at different lines, so the whole screen can
+            show up to 61 colours at once (64 minus the shared transparent slot
+            in each line, roughly). That constraint — 16 colours per tile, from
+            one of four lines — shapes how Genesis art was drawn from day one.
+          </p>
+          <p>
+            And how is one CRAM colour stored? Not as 8 bits per channel. Each
+            colour is <strong>9 bits</strong>: 3 bits each of blue, green and red
+            — packed as <code>0000&nbsp;BBB0&nbsp;GGG0&nbsp;RRR0</code> in a 16-bit
+            word (this is
+            <span class="term" data-tip="The Genesis colour format: 3 bits each of Blue, Green, Red — the order and the padding zero bits are how the hardware wires it.">9-bit BGR</span>).
+            Three bits per channel means <strong>8 levels</strong> each, so the
+            master palette the hardware can make is
+            8&nbsp;×&nbsp;8&nbsp;×&nbsp;8&nbsp;=&nbsp;<strong>512 colours</strong>.
+            A game chooses 64 of those 512 to be live at any moment. (Module 12
+            shows a trick that effectively triples this by dimming and brightening
+            — but the base is 512.)
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A paint-by-numbers set</span>
+            <p>
+              A paint-by-numbers canvas has numbered regions and a small tray of
+              numbered paints. The canvas (your tiles) only stores <em>numbers</em>;
+              the tray (the
+              <span class="term" data-tip="The 16-colour table a tile's indices point into. The Genesis has four of them in CRAM.">palette</span>)
+              holds the actual colours. Swap the tray for an autumn one and the
+              same numbered canvas repaints itself in browns — no region redrawn.
+              The Genesis has four little trays of sixteen paints, mixed from a
+              master set of exactly 512.
+            </p>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 170" role="img" aria-label="A 16-bit CRAM word split into 3-bit blue, green and red fields">
+              <text x="30" y="26" class="d-tag d-red">one CRAM colour = 16-bit word</text>
+              <g>
+                <rect x="30" y="40" width="52" height="46" rx="6" class="d-fill-panel d-stroke-line" stroke-width="1.4"/>
+                <text x="56" y="68" text-anchor="middle" class="d-sub">0000</text>
+                <rect x="86" y="40" width="52" height="46" rx="6" class="d-fill-panel" style="fill:#123a5e" stroke="#3fb5ff" stroke-width="1.6"/>
+                <text x="112" y="62" text-anchor="middle" class="d-num" style="font-size:12px">BBB</text>
+                <text x="112" y="78" text-anchor="middle" class="d-sub">0</text>
+                <rect x="142" y="40" width="52" height="46" rx="6" class="d-fill-panel" style="fill:#1a3f2a" stroke="#4fd08a" stroke-width="1.6"/>
+                <text x="168" y="62" text-anchor="middle" class="d-num" style="font-size:12px">GGG</text>
+                <text x="168" y="78" text-anchor="middle" class="d-sub">0</text>
+                <rect x="198" y="40" width="52" height="46" rx="6" class="d-fill-panel" style="fill:#4a1a18" stroke="#ff5347" stroke-width="1.6"/>
+                <text x="224" y="62" text-anchor="middle" class="d-num" style="font-size:12px">RRR</text>
+                <text x="224" y="78" text-anchor="middle" class="d-sub">0</text>
+              </g>
+              <text x="30" y="108" class="d-sub">3 bits/channel → 8 levels each → 8×8×8 =</text>
+              <text x="30" y="128" class="d-tag d-gold">512 master colours</text>
+              <text x="440" y="26" class="d-tag d-blue">CRAM · 4 lines × 16 = 64 live entries</text>
+              <g>
+                <rect x="440" y="40" width="360" height="20" fill="#2a6cc0"/><rect x="440" y="62" width="360" height="20" fill="#c98a1e"/><rect x="440" y="84" width="360" height="20" fill="#e23b30"/><rect x="440" y="106" width="360" height="20" fill="#2a9a5e"/>
+                <g stroke="#0e1017" stroke-width="1">
+                  <line x1="462.5" y1="40" x2="462.5" y2="126"/><line x1="485" y1="40" x2="485" y2="126"/><line x1="507.5" y1="40" x2="507.5" y2="126"/><line x1="530" y1="40" x2="530" y2="126"/><line x1="552.5" y1="40" x2="552.5" y2="126"/><line x1="575" y1="40" x2="575" y2="126"/><line x1="597.5" y1="40" x2="597.5" y2="126"/><line x1="620" y1="40" x2="620" y2="126"/><line x1="642.5" y1="40" x2="642.5" y2="126"/><line x1="665" y1="40" x2="665" y2="126"/><line x1="687.5" y1="40" x2="687.5" y2="126"/><line x1="710" y1="40" x2="710" y2="126"/><line x1="732.5" y1="40" x2="732.5" y2="126"/><line x1="755" y1="40" x2="755" y2="126"/><line x1="777.5" y1="40" x2="777.5" y2="126"/>
+                </g>
+              </g>
+              <text x="440" y="146" class="d-sub">a tile uses ONE line's 16 colours; index 0 of each line is transparent</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Nine bits of colour.</strong> A CRAM word carries 3 bits each of B, G and R — eight levels a channel, 512 colours the hardware can mix. Sixty-four of them are live at once, in four lines of sixteen.</figcaption>
+          </figure>
+
+          <p>
+            The lab is a live CRAM editor. Click any of the 64 swatches, then set
+            its blue, green and red to one of 8 levels each — the raw 9-bit value
+            and its hex CRAM word update as you go. Notice how coarse 8 levels is,
+            and how much character artists wrung from it anyway.
+          </p>
+
+          <div class="lab" id="lab-palette">
+            <div class="lab-head"><span class="dot"></span><span class="title">CRAM lab — explore 64 colours in 9-bit BGR</span><span class="badge">Canvas · live</span></div>
+            <div class="lab-body">
+              <canvas class="gfx" aria-label="A 4x16 CRAM grid with an editable selected colour"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Blue — <span class="val" data-cb-val>0</span> / 7</label>
+                  <input type="range" min="0" max="7" step="1" value="0" data-cb aria-label="Blue level 0-7">
+                </div>
+                <div class="ctrl">
+                  <label>Green — <span class="val" data-cg-val>0</span> / 7</label>
+                  <input type="range" min="0" max="7" step="1" value="0" data-cg aria-label="Green level 0-7">
+                </div>
+                <div class="ctrl">
+                  <label>Red — <span class="val" data-cr-val>0</span> / 7</label>
+                  <input type="range" min="0" max="7" step="1" value="0" data-cr aria-label="Red level 0-7">
+                </div>
+              </div>
+              <div class="lab-readout" data-pal-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Indexed colour: a tile pixel is an index into a 16-colour palette; recolour the table and the whole tile changes.</li>
+              <li>CRAM holds 64 entries as 4 lines of 16; a tile uses one line, so 16 colours per tile.</li>
+              <li>Each colour is 9-bit BGR — 3 bits (8 levels) per channel — from a master set of 8³ = 512 colours.</li>
+              <li>Index 0 in a line reads as transparent; shadow/highlight (Module 12) stretches the palette further.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#tiles"><span class="dir">← Prev</span><span class="ttl">02 · Tiles &amp; patterns</span></a>
+            <a class="next" href="#nametable"><span class="dir">Next →</span><span class="ttl">04 · Nametables &amp; the tilemap</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 04 --- -->
+      <section class="doc" id="nametable">
+        <div class="mod-head">
+          <span class="eye">Module 04 <span class="part-tag">· Part I</span></span>
+          <h3>Nametables &amp; the tilemap</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Assemble tiles into a whole background — the map of &ldquo;which tile goes where&rdquo; — and decode the 16-bit word that also stores palette, flip and priority.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            We have tiles (Module 02) and colours for them (Module 03). Now we
+            arrange them into a picture. The background isn't stored as pixels;
+            it's stored as a grid of <em>references</em> — &ldquo;cell (5,3) uses
+            tile 42.&rdquo; That grid is the
+            <span class="term" data-tip="A grid in VRAM of 16-bit entries, one per on-screen cell, saying which tile to draw there and how. Sega's name for a background's tilemap.">nametable</span>
+            (Sega's word for a tilemap), and it is astonishingly cheap: one screen
+            of background is a few kilobytes of tile numbers, pointing into the
+            tiles you already stored once.
+          </p>
+          <p>
+            Each nametable cell is a single <strong>16-bit word</strong>, and it
+            carries more than a tile number. Bit by bit it packs: the low
+            <strong>11 bits</strong> are the tile index (which of up to 2,048
+            patterns); then a <strong>horizontal-flip</strong> bit and a
+            <strong>vertical-flip</strong> bit (so one stored tile can face four
+            ways — huge memory savings for symmetric art); then <strong>2 bits</strong>
+            of palette line (Module 03's four lines); and the top bit is
+            <span class="term" data-tip="A per-cell (and per-sprite) bit choosing whether a tile draws in the high-priority or low-priority layer — the basis of how planes and sprites interleave in depth.">priority</span>,
+            which decides whether this tile sits in the front or back layer when
+            planes and sprites overlap (Modules 09 and 12). One word, and the tile
+            is fully specified: <em>what, which colours, which way up, how near</em>.
+          </p>
+          <p>
+            Flip and palette bits are the frugal genius of the scheme. A perfectly
+            symmetric arch needs only its left half stored; the right half is the
+            same tiles with the H-flip bit set. A recoloured enemy is the same
+            tiles pointing at a different palette line. On a machine with 64&nbsp;KB
+            of VRAM, every one of these tricks is bytes back in the bank.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A seating chart</span>
+            <p>
+              A wedding planner doesn't glue photos of guests onto a floor plan;
+              they write names in a grid of chairs. The
+              <span class="term" data-tip="The grid of 16-bit cells saying which tile (and how) fills each screen position.">nametable</span>
+              is that seating chart: each cell just <em>names</em> a tile from the
+              tray and adds a couple of notes — face this way, wear this palette,
+              sit up front. Rearranging the party is rewriting names, not
+              repainting faces.
+            </p>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 140" role="img" aria-label="The 16 bits of one nametable entry: priority, palette, V-flip, H-flip, tile index">
+              <text x="30" y="26" class="d-tag d-red">one nametable cell = 16 bits</text>
+              <rect x="30" y="40" width="48" height="52" rx="6" class="d-fill-panel" style="fill:#3a1512" stroke="#ffc44d" stroke-width="1.6"/>
+              <text x="54" y="62" text-anchor="middle" class="d-num" style="font-size:13px">P</text>
+              <text x="54" y="80" text-anchor="middle" class="d-sub">pri</text>
+              <rect x="82" y="40" width="70" height="52" rx="6" class="d-fill-panel d-red-s" stroke-width="1.6"/>
+              <text x="117" y="62" text-anchor="middle" class="d-num" style="font-size:13px">CC</text>
+              <text x="117" y="80" text-anchor="middle" class="d-sub">palette</text>
+              <rect x="156" y="40" width="48" height="52" rx="6" class="d-fill-panel d-blue-s" stroke-width="1.6"/>
+              <text x="180" y="62" text-anchor="middle" class="d-num" style="font-size:13px">V</text>
+              <text x="180" y="80" text-anchor="middle" class="d-sub">vflip</text>
+              <rect x="208" y="40" width="48" height="52" rx="6" class="d-fill-panel d-blue-s" stroke-width="1.6"/>
+              <text x="232" y="62" text-anchor="middle" class="d-num" style="font-size:13px">H</text>
+              <text x="232" y="80" text-anchor="middle" class="d-sub">hflip</text>
+              <rect x="260" y="40" width="240" height="52" rx="6" class="d-fill-panel d-stroke-line" stroke-width="1.6"/>
+              <text x="380" y="62" text-anchor="middle" class="d-num" style="font-size:13px">TTTTTTTTTTT</text>
+              <text x="380" y="80" text-anchor="middle" class="d-sub">11-bit tile index (0–2047)</text>
+              <text x="540" y="58" class="d-sub">&ldquo;what, which colours,</text>
+              <text x="540" y="76" class="d-sub">which way up, how near&rdquo;</text>
+              <text x="540" y="100" class="d-flow d-gold">— all in one word per cell</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Sixteen bits per cell.</strong> Priority · palette line · V-flip · H-flip · 11-bit tile index. A whole background is a grid of these tiny words, each pointing into the tiles you stored once.</figcaption>
+          </figure>
+
+          <p>
+            The lab is a working nametable. Pick a brush tile from the strip, set
+            its palette line, flips and priority, then click cells to place it —
+            and watch the decoded 16-bit word for the last cell you touched. Build
+            a little scene; every cell you set is two bytes of tilemap.
+          </p>
+
+          <div class="lab" id="lab-nametable">
+            <div class="lab-head"><span class="dot"></span><span class="title">Nametable lab — place tiles &amp; read the entry bits</span><span class="badge">Canvas · click</span></div>
+            <div class="lab-body">
+              <canvas class="gfx tall paint" aria-label="A nametable grid with a tile brush and attributes"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Palette line</label>
+                  <div class="seg-btns" data-pline role="group" aria-label="Palette line">
+                    <button class="on" data-l="0">0</button><button data-l="1">1</button><button data-l="2">2</button><button data-l="3">3</button>
+                  </div>
+                </div>
+                <div class="ctrl">
+                  <label>Attributes</label>
+                  <div class="seg-btns" role="group" aria-label="Tile attributes">
+                    <button data-attr="hf">H-flip</button><button data-attr="vf">V-flip</button><button data-attr="pri">priority</button>
+                  </div>
+                </div>
+              </div>
+              <div class="lab-readout" data-name-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A background is a nametable (tilemap): a grid of 16-bit cells naming which tile fills each position.</li>
+              <li>Each cell packs priority (1) · palette line (2) · V-flip (1) · H-flip (1) · tile index (11).</li>
+              <li>Flip and palette bits let one stored tile face four ways and wear four colour sets — big VRAM savings.</li>
+              <li>The nametable is tiny compared to a pixel framebuffer, which is exactly why it fits and can scroll (Module 05).</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#palettes"><span class="dir">← Prev</span><span class="ttl">03 · Palettes &amp; colour</span></a>
+            <a class="next" href="#scroll"><span class="dir">Next →</span><span class="ttl">05 · Scrolling</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 05 --- -->
+      <section class="doc" id="scroll">
+        <div class="mod-head">
+          <span class="eye">Module 05 <span class="part-tag">· Part I</span></span>
+          <h3>Scrolling</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Turn a static tilemap into a moving world — a plane bigger than the screen, shifted by a couple of registers, wrapping seamlessly.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A nametable (Module 04) can describe a background <em>larger than the
+            screen</em> — the Genesis planes can be up to 64&nbsp;×&nbsp;32,
+            64&nbsp;×&nbsp;64 or 128&nbsp;×&nbsp;32 cells, well past the ~40×28 the
+            TV shows. Only a window onto that map is visible at any moment. Move
+            the window and the world appears to move — that's
+            <strong>scrolling</strong>, and it is why side-scrollers exist. The
+            revolutionary part: you don't redraw anything. You change a small
+            <span class="term" data-tip="A hardware register holding the current horizontal or vertical scroll offset. The VDP adds it to every fetch, so moving the whole world costs one write.">scroll register</span>,
+            and the VDP simply starts reading the map from a different offset.
+            Moving a whole world costs a single number.
+          </p>
+          <p>
+            Two things make it seamless. First, the plane <strong>wraps</strong>:
+            read past the right edge and you wrap to the left, so a map only a
+            little wider than the screen can scroll forever if it's designed to
+            tile. Second, the offset is in <em>pixels</em>, not cells, so motion
+            is smooth to the pixel even though the map is stored in 8-pixel cells —
+            the VDP fetches a whole cell and shows the correct 8-pixel-wide slice.
+            Games stream fresh tiles into the columns and rows about to appear at
+            the edges, so an endless level lives in a plane barely bigger than the
+            screen.
+          </p>
+          <p>
+            The Genesis offers this on two independent planes at once (Module 09),
+            and with per-line and per-cell variations (Module 11) that produce
+            parallax and wobble. But the core is this module's one idea: a big map,
+            a small window, and a register that slides one over the other.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A map under a magnifying frame</span>
+            <p>
+              Lay a long paper map on a desk and slide a cardboard frame across
+              it: you see only the framed patch, and sliding the frame reveals new
+              country without moving the map. The
+              <span class="term" data-tip="The offset the VDP adds when reading the tilemap; changing it slides the visible window over a larger plane.">scroll register</span>
+              is where you've slid the frame. Loop the map into a ring and you can
+              slide forever.
+            </p>
+          </div>
+
+          <p>
+            The lab shows a plane far larger than its viewport. Drag the scroll X
+            and Y (or hit auto-scroll) and watch the window glide over the map,
+            wrapping at the edges — the minimap shows where the visible rectangle
+            sits on the whole 64×32 plane.
+          </p>
+
+          <div class="lab" id="lab-scroll">
+            <div class="lab-head"><span class="dot"></span><span class="title">Scroll lab — a window onto a plane bigger than the screen</span><span class="badge">Canvas · animated</span></div>
+            <div class="lab-body">
+              <canvas class="gfx" aria-label="A viewport scrolling over a large wrapping tilemap"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Scroll X (pixels)</label>
+                  <input type="range" min="0" max="511" value="60" data-sx aria-label="Horizontal scroll">
+                </div>
+                <div class="ctrl">
+                  <label>Scroll Y (pixels)</label>
+                  <input type="range" min="0" max="255" value="24" data-sy aria-label="Vertical scroll">
+                </div>
+                <button class="play-btn" data-scroll-play></button>
+              </div>
+              <div class="lab-readout" data-scroll-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A plane can be far bigger than the screen; only a window is visible, and moving the window = scrolling.</li>
+              <li>Scrolling costs a scroll-register write, not a redraw — the VDP just reads the map from a new offset.</li>
+              <li>Planes wrap seamlessly, and offsets are per-pixel, so motion is smooth despite 8-pixel cells.</li>
+              <li>Endless levels stream new tiles into the edges of a plane only slightly larger than the screen.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#nametable"><span class="dir">← Prev</span><span class="ttl">04 · Nametables &amp; the tilemap</span></a>
+            <a class="next" href="#sprites"><span class="dir">Next →</span><span class="ttl">06 · Sprites</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 06 --- -->
+      <section class="doc" id="sprites">
+        <div class="mod-head">
+          <span class="eye">Module 06 <span class="part-tag">· Part I</span></span>
+          <h3>Sprites</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the movable object — a tile group that floats freely over the backgrounds, with its own position, flip and priority — the hero, the enemies, the bullets.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Backgrounds are locked to their grid: a nametable cell is always at a
+            cell position. But a game needs things that move <em>independently</em>
+            of the grid — Sonic, a ring, a laser. Those are
+            <span class="term" data-tip="A graphic object the VDP positions freely (to the pixel) over the background planes, composed of one or more 8×8 tiles.">sprites</span>:
+            groups of tiles the VDP places at any pixel position, over the planes,
+            without disturbing the background at all. A sprite is defined not in
+            the tilemap but in a separate list — the sprite attribute table — and
+            the VDP composites it on top as it draws.
+          </p>
+          <p>
+            A Genesis sprite can be up to <strong>4×4 cells</strong> (32×32 pixels)
+            from a single entry, and each entry stores: the sprite's Y and X
+            position, its <strong>size</strong> in cells, a <strong>link</strong>
+            field (the index of the next sprite to process — sprites form a linked
+            list), and the familiar attribute bits — palette line, H/V flip and
+            <span class="term" data-tip="The sprite's priority bit: whether it draws in front of, or behind, high-priority background tiles.">priority</span>.
+            Priority is what lets a character walk <em>behind</em> a foreground
+            pillar: a high-priority background tile can out-rank a low-priority
+            sprite. That single bit, shared with Module 04's nametable, is how the
+            whole scene interleaves in depth without a per-pixel depth buffer.
+          </p>
+          <p>
+            Big characters are just several sprites linked together and moved in
+            lockstep — Sonic is a little flock of sprites. That flexibility is
+            free-ish, but not unlimited: the VDP can only process so many sprites
+            per scanline before it runs out of time, which is the hard, visible
+            limit we dig into in Module 10.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Felt figures on a storyboard</span>
+            <p>
+              A background painting is fixed, but the animator lays felt cut-outs
+              on top and slides them around to tell the story. A
+              <span class="term" data-tip="Freely positioned tile groups the VDP draws over the backgrounds.">sprite</span>
+              is a felt figure: it floats over the scene, can be flipped, tinted
+              with a palette line, and told to tuck <em>behind</em> a foreground
+              cut-out. Nothing underneath is touched — lift the figure and the
+              painting is intact.
+            </p>
+          </div>
+
+          <p>
+            The lab composes a small sprite from a 3×3 grid of tiles. Drag it over
+            the background; toggle H/V flip; and flip its priority to send it
+            <em>behind</em> the brick wall (high-priority background) or back in
+            front. That toggle is the entire depth model of the machine.
+          </p>
+
+          <div class="lab" id="lab-sprite">
+            <div class="lab-head"><span class="dot"></span><span class="title">Sprite lab — compose, flip &amp; prioritise</span><span class="badge">Canvas · drag</span></div>
+            <div class="lab-body">
+              <canvas class="gfx tall grab" aria-label="A composed sprite draggable over a background with priority toggling"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Sprite attributes</label>
+                  <div class="seg-btns" role="group" aria-label="Sprite attributes">
+                    <button data-sp="hf">H-flip</button><button data-sp="vf">V-flip</button><button class="on" data-sp="pri">priority (front)</button>
+                  </div>
+                </div>
+              </div>
+              <div class="lab-readout" data-sprite-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Sprites are tile groups positioned freely over the planes, defined in a separate attribute table, not the tilemap.</li>
+              <li>Each entry stores position, size (up to 4×4 cells), a link to the next sprite, palette, flip and priority.</li>
+              <li>The priority bit — shared with nametable cells — is how sprites pass in front of or behind background layers.</li>
+              <li>Large characters are several linked sprites; the cost is the per-scanline sprite limit (Module 10).</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#scroll"><span class="dir">← Prev</span><span class="ttl">05 · Scrolling</span></a>
+            <a class="next" href="#vdp"><span class="dir">Next → Part II</span><span class="ttl">07 · Meet the VDP</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART II ============= -->
+      <section class="part" id="part-2">
+        <div class="part-inner">
+          <div class="kicker">Part II</div>
+          <h3>The Sega VDP</h3>
+          <p>
+            Now we put the Part&nbsp;I toolkit into real silicon. The Genesis draws
+            <em>everything</em> with one chip — the <strong>VDP</strong>, the Video
+            Display Processor — that owns three separate memories, two scrolling
+            planes plus a window, a sprite engine, and a bag of raster and colour
+            tricks. These seven modules cover the chip, its memory, its planes,
+            the sprite engine's famous limits, per-line scroll effects,
+            shadow/highlight, and the DMA pipeline that feeds it. From here on we
+            name real hardware, but every piece maps back to a fundamental you
+            already know.
+          </p>
+          <div class="part-meta"><span>Modules <b>07–13</b></span><span>Difficulty <b>Hardware</b></span><span>Labs <b>4 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 07 --- -->
+      <section class="doc" id="vdp">
+        <div class="mod-head">
+          <span class="eye">Module 07 <span class="part-tag">· Part II</span></span>
+          <h3>Meet the VDP</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the actual chip — its lineage, what it produces, and how it fits between the 68000, the Z80 and your television.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The Genesis graphics chip is the <strong>VDP</strong>, part number
+            <strong>315-5313</strong>, descended from the Texas Instruments
+            TMS9918 line by way of the Sega Master System's VDP (the
+            <span class="term" data-tip="The chip family the Genesis VDP grew from — a Sega-enhanced descendant of the TMS9918-era video chips, roughly a super-set of the Master System's video hardware.">YM7101/315-5313 lineage</span>).
+            It is a fixed-function tile-and-sprite engine: you don't program it
+            with code, you <em>configure</em> it through two dozen internal
+            registers and feed it data. It renders <strong>256×224</strong>
+            (H32) or <strong>320×224</strong> (H40) pixels on NTSC — 240 lines on
+            PAL — one scanline at a time, sixty (or fifty) times a second.
+          </p>
+          <p>
+            The VDP sits at the centre of the console's video world. The main CPU
+            — a Motorola <strong>68000 at 7.67&nbsp;MHz</strong> — writes tiles,
+            tilemaps, palettes and sprite lists to the VDP and sets its registers.
+            The VDP owns three private memories (Module 08), does all the
+            compositing, and scans the finished image out to the TV. It also
+            generates the two interrupts games live by: a
+            <span class="term" data-tip="Vertical-blank interrupt — fires once per frame when the beam finishes the visible area; games use it to safely update graphics.">VBlank</span>
+            once per frame (level 6 on the 68000) and a programmable
+            <span class="term" data-tip="Horizontal-blank interrupt — fires after a chosen scanline, letting the CPU change VDP registers mid-screen. The engine of raster effects (Module 11).">HBlank</span>
+            (level 4) after a chosen line — the timer that makes mid-screen tricks
+            possible.
+          </p>
+          <p>
+            Calling the VDP &ldquo;just a graphics chip&rdquo; undersells its role
+            as traffic cop: it arbitrates access to VRAM between its own rendering
+            and the CPU's writes, runs the DMA engine that blasts data into video
+            memory (Module 13), and even passes the Z80 sound CPU's world by
+            sharing the bus. Everything you see on a Genesis passed through this
+            one chip.
+          </p>
+
+          <div class="specs">
+            <div class="spec"><div class="k">Part</div><div class="v">315<small>-5313</small></div><div class="d">Sega VDP · TMS99xx lineage</div></div>
+            <div class="spec"><div class="k">Resolution</div><div class="v">320×224</div><div class="d">H40 · or 256×224 (H32)</div></div>
+            <div class="spec"><div class="k">Colours</div><div class="v">64<small> / 512</small></div><div class="d">live from a 512 master set</div></div>
+            <div class="spec"><div class="k">Planes</div><div class="v">A B<small> + W</small></div><div class="d">two scroll planes + window</div></div>
+            <div class="spec"><div class="k">Sprites</div><div class="v hi">80</div><div class="d">on screen (H40) · 20/line</div></div>
+            <div class="spec"><div class="k">Refresh</div><div class="v">60<small> Hz</small></div><div class="d">NTSC 224 lines · PAL 50/240</div></div>
+          </div>
+
+          <figure class="dsp-diagram">
+            <svg viewBox="0 0 940 380" role="img" aria-labelledby="vdpdiag-t vdpdiag-d">
+              <title id="vdpdiag-t">Genesis VDP in the system</title>
+              <desc id="vdpdiag-d">The 68000 CPU writes to the VDP, which owns VRAM, CRAM and VSRAM, composites planes and sprites, and scans out to the TV. The Z80 shares the bus for sound.</desc>
+              <defs><marker id="v7" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker>
+              <marker id="v7b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#3fb5ff"/></marker></defs>
+              <rect x="16" y="150" width="150" height="72" rx="10" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="91" y="182" text-anchor="middle" class="d-label">68000 CPU</text>
+              <text x="91" y="202" text-anchor="middle" class="d-sub">7.67 MHz</text>
+              <rect x="16" y="252" width="150" height="60" rx="10" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="91" y="280" text-anchor="middle" class="d-label" style="font-size:13px">Z80</text>
+              <text x="91" y="298" text-anchor="middle" class="d-sub">sound CPU</text>
+              <line x1="166" y1="176" x2="228" y2="176" class="d-blue-s" fill="none" stroke-width="1.8" marker-end="url(#v7b)"/>
+              <text x="166" y="160" class="d-flow d-blue">tiles · maps · regs (DMA, Mod 13)</text>
+
+              <rect x="230" y="40" width="470" height="300" rx="16" class="d-fill-ground d-stroke-line" stroke-width="1.5"/>
+              <text x="250" y="68" class="d-tag">VDP · 315-5313</text>
+              <text x="250" y="86" class="d-sub">fixed-function tile &amp; sprite engine</text>
+
+              <rect x="250" y="100" width="200" height="50" rx="9" class="d-fill-panel d-blue-s" stroke-width="1.5"/>
+              <text x="350" y="123" text-anchor="middle" class="d-label" style="font-size:13px">registers + DMA</text>
+              <text x="350" y="140" text-anchor="middle" class="d-sub">24 config regs</text>
+              <rect x="250" y="164" width="200" height="50" rx="9" class="d-fill-panel d-red-s" stroke-width="1.5"/>
+              <text x="350" y="187" text-anchor="middle" class="d-label" style="font-size:13px">plane + sprite compositor</text>
+              <text x="350" y="204" text-anchor="middle" class="d-sub">A · B · window · sprites</text>
+              <rect x="250" y="228" width="200" height="50" rx="9" class="d-fill-panel d-gold-s" stroke-width="1.5"/>
+              <text x="350" y="251" text-anchor="middle" class="d-label" style="font-size:13px">scanline scan-out</text>
+              <text x="350" y="268" text-anchor="middle" class="d-sub">+ VBlank / HBlank IRQ</text>
+
+              <rect x="470" y="100" width="210" height="42" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="575" y="126" text-anchor="middle" class="d-label" style="font-size:12.5px">VRAM · 64 KB</text>
+              <rect x="470" y="150" width="210" height="42" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="575" y="176" text-anchor="middle" class="d-label" style="font-size:12.5px">CRAM · 64 colours</text>
+              <rect x="470" y="200" width="210" height="42" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="575" y="226" text-anchor="middle" class="d-label" style="font-size:12.5px">VSRAM · 80 bytes</text>
+              <text x="470" y="266" class="d-sub">the VDP's three private memories (Module 08)</text>
+
+              <rect x="760" y="150" width="160" height="72" rx="10" class="d-fill-panel2 d-gold-s" stroke-width="1.5"/>
+              <text x="840" y="182" text-anchor="middle" class="d-label">TV</text>
+              <text x="840" y="202" text-anchor="middle" class="d-sub">interlaced CRT · 60 Hz</text>
+              <line x1="700" y1="252" x2="838" y2="200" class="d-axis" stroke-width="1.8" marker-end="url(#v7)"/>
+              <text x="705" y="270" class="d-flow">analogue video out</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The chip in context.</strong> The 68000 feeds the VDP tiles, tilemaps, palettes and sprite lists; the VDP owns three memories, composites the whole scene, raises VBlank/HBlank interrupts, and scans the picture out to the TV. Modules 08–13 walk this diagram.</figcaption>
+          </figure>
+
+          <div class="note hw">
+            <div class="ico">▍</div>
+            <div><p><strong>On the numbers.</strong> &ldquo;Blast processing,&rdquo;
+            Sega's famous slogan, was marketing for fast DMA into VRAM — real, but
+            not a magic mode. The honest figures are the ones above: 64 colours of
+            512, two planes, a hard sprite budget, and a scanline clock. The
+            artistry was in spending them.</p></div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The VDP (315-5313) is a fixed-function tile/sprite engine you configure through registers, not code.</li>
+              <li>It renders 320×224 (H40) or 256×224 (H32), 224 NTSC lines / 240 PAL, one scanline at a time.</li>
+              <li>It owns three memories, composites planes + sprites, and raises VBlank and programmable HBlank interrupts.</li>
+              <li>&ldquo;Blast processing&rdquo; was fast-DMA marketing — the real budget is 64/512 colours, two planes and a sprite limit.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#sprites"><span class="dir">← Prev · Part I</span><span class="ttl">06 · Sprites</span></a>
+            <a class="next" href="#memory"><span class="dir">Next →</span><span class="ttl">08 · VRAM, CRAM &amp; VSRAM</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 08 --- -->
+      <section class="doc" id="memory">
+        <div class="mod-head">
+          <span class="eye">Module 08 <span class="part-tag">· Part II</span></span>
+          <h3>VRAM, CRAM &amp; VSRAM</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Tour the VDP's three separate memories — what each holds, how big it is, and why the graphics chip keeps them apart from the CPU's RAM.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The VDP doesn't draw from the 68000's work RAM. It has its own memory,
+            and — a detail that trips up newcomers — it's actually
+            <em>three</em> separate memories, each purpose-built. Keeping them
+            distinct lets the hardware read all three simultaneously while
+            building a scanline, which is the only way it keeps up with the beam.
+          </p>
+          <div class="defs">
+            <div class="row"><dt>VRAM · 64 KB</dt><dd>Video RAM — the big one. It holds the tile patterns (Module 02), the nametables for planes A and B and the window (Module 04), the sprite attribute table (Module 06), and the horizontal-scroll table (Module 11). Everything with <em>shape</em> lives here.</dd></div>
+            <div class="row"><dt>CRAM · 128 bytes</dt><dd>Colour RAM — the palettes (Module 03): 64 entries of 9-bit BGR, four lines of sixteen. Tiny, but it defines every colour on screen.</dd></div>
+            <div class="row"><dt>VSRAM · 80 bytes</dt><dd>Vertical Scroll RAM — holds the per-column <em>vertical</em> scroll offsets (Module 11). Just enough for planes A and B in 2-cell columns; the specialised memory that makes vertical parallax possible.</dd></div>
+          </div>
+          <p>
+            The sizes tell a story. 64&nbsp;KB of VRAM is the whole graphical
+            world — every tile, map and sprite must fit, which is why Modules 02
+            and 04 were so obsessed with reuse. CRAM is tiny because indexed colour
+            (Module 03) needs only 64 entries. And VSRAM is tiny and weird — 80
+            bytes — because it does exactly one narrow job: remember how far up or
+            down each pair of columns has scrolled.
+          </p>
+          <p>
+            The CPU can't touch these memories directly like normal RAM. It reaches
+            them through the VDP's <strong>data and control ports</strong>: set an
+            address, then stream words in. During active display the VDP is busy
+            with the beam, so writes mostly happen during VBlank — or via DMA,
+            which muscles data in fast (Module 13). This port-and-timing dance is
+            the source of half of Part III's emulation headaches.
+          </p>
+
+          <div class="memmap">
+            <div class="bar">
+              <div class="seg" style="flex: 8; background:#ff5347">Tiles<small>patterns</small></div>
+              <div class="seg" style="flex: 3; background:#3fb5ff">Plane A<small>map</small></div>
+              <div class="seg" style="flex: 3; background:#2a9a5e">Plane B<small>map</small></div>
+              <div class="seg" style="flex: 1.4; background:#ffc44d">Window<small>map</small></div>
+              <div class="seg" style="flex: 1.4; background:#c98a1e">Sprites<small>table</small></div>
+              <div class="seg" style="flex: 1; background:#9aa3b8">HScroll</div>
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin:8px 2px 0">A typical 64&nbsp;KB VRAM layout — proportions vary per game, but tiles dominate; the maps, sprite list and scroll table are comparatively tiny.</p>
+          </div>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A print shop's back room</span>
+            <p>
+              Think of a print shop: a big rack of carved
+              <span class="term" data-tip="Video RAM — 64 KB holding tile patterns, the nametables, the sprite table and the H-scroll table.">stamps and layout sheets</span>
+              (VRAM), a small tray of
+              <span class="term" data-tip="Colour RAM — 128 bytes, 64 palette entries.">ink pots</span>
+              (CRAM), and a slim notebook of
+              <span class="term" data-tip="Vertical Scroll RAM — 80 bytes of per-column vertical scroll offsets.">margin settings</span>
+              (VSRAM). Three stores, three jobs, all reachable at once — because
+              the press can't wait for one clerk to fetch everything in turn.
+            </p>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The VDP has three private memories, read in parallel while a scanline is built.</li>
+              <li>VRAM (64 KB) holds tiles, the plane and window nametables, the sprite table and the H-scroll table.</li>
+              <li>CRAM (128 bytes) holds the 64 palette colours; VSRAM (80 bytes) holds per-column vertical scroll.</li>
+              <li>The CPU reaches them only through the VDP's ports (or DMA), mostly during VBlank — a timing dance that matters in Part III.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#vdp"><span class="dir">← Prev</span><span class="ttl">07 · Meet the VDP</span></a>
+            <a class="next" href="#planes"><span class="dir">Next →</span><span class="ttl">09 · Planes A, B &amp; the window</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 09 --- -->
+      <section class="doc" id="planes">
+        <div class="mod-head">
+          <span class="eye">Module 09 <span class="part-tag">· Part II</span></span>
+          <h3>Planes A, B &amp; the window</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how two independent scroll planes plus a fixed window stack into depth — and how scrolling them at different speeds fakes a third dimension.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The VDP composites <strong>two full scrolling planes</strong> —
+            <strong>Plane A</strong> and <strong>Plane B</strong> — each its own
+            nametable (Module 04), each with its own scroll registers (Module 05).
+            Plane B is usually the far background, Plane A the nearer one, and
+            sprites float over both. Because each plane scrolls on its own numbers,
+            you can move them at <em>different speeds</em>: shift the far plane
+            slowly and the near plane quickly, and your eye reads the difference as
+            distance. That's
+            <span class="term" data-tip="Scrolling background layers at different speeds so nearer ones move faster, tricking the eye into seeing depth on a 2D screen.">parallax</span>,
+            and it is the signature look of 16-bit side-scrollers.
+          </p>
+          <p>
+            Depth between the two planes isn't only front-to-back order — the
+            priority bit (Module 04) interleaves them per tile. A high-priority
+            Plane&nbsp;A tile can sit above Plane&nbsp;B, while a low-priority
+            Plane&nbsp;A tile tucks beneath it, so foliage, bridges and foreground
+            arches can weave through the scene. Add the sprite priority bit
+            (Module 06) and the VDP resolves a surprisingly rich depth order from
+            just one bit per element.
+          </p>
+          <p>
+            The third layer is the <span class="term" data-tip="A special region of Plane A that ignores scrolling — locked to screen coordinates. Used for status bars, HUDs and menus.">window</span>:
+            a rectangular area, locked to Plane A's tiles but <em>not</em> scrolled,
+            pinned to screen coordinates. Games carve the window out for status
+            bars, score displays and life meters — the strip that stays put while
+            the world scrolls beneath it. It isn't a third scroll plane; it's a
+            fixed cut-out of Plane A that the VDP draws instead of the scrolling
+            version wherever the window is enabled.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Theatre scenery flats</span>
+            <p>
+              On a stage, painted backdrops hang on rails at different depths and
+              slide at different rates to suggest travel — the far mountain
+              backdrop crawls, the near hedge rushes past. Plane B and Plane A are
+              those flats; sliding them at different speeds is
+              <span class="term" data-tip="Different-speed background layers reading as depth.">parallax</span>.
+              The <span class="term" data-tip="The non-scrolling HUD region of Plane A.">window</span>
+              is the proscenium arch — bolted to the theatre, never moving with the
+              scenery.
+            </p>
+          </div>
+
+          <p>
+            The lab runs a real two-plane parallax scene. Plane B carries a distant
+            starfield and mountains; Plane A the near ground and trees. Set each
+            plane's speed and watch depth appear and vanish — set them equal and
+            the world flattens; spread them and it leaps into 3D.
+          </p>
+
+          <div class="lab" id="lab-planes">
+            <div class="lab-head"><span class="dot"></span><span class="title">Parallax lab — two planes, two speeds</span><span class="badge">Canvas · animated</span></div>
+            <div class="lab-body">
+              <canvas class="gfx" aria-label="A two-plane parallax scroller with independent speeds"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Plane A (near) — <span class="val" data-pa-val>2.4×</span></label>
+                  <input type="range" min="0" max="4" step="0.1" value="2.4" data-pa aria-label="Plane A speed">
+                </div>
+                <div class="ctrl">
+                  <label>Plane B (far) — <span class="val" data-pb-val>0.6×</span></label>
+                  <input type="range" min="0" max="2" step="0.1" value="0.6" data-pb aria-label="Plane B speed">
+                </div>
+                <button class="play-btn" data-planes-play></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The VDP composites two independent scroll planes, A and B, plus a fixed window region of Plane A.</li>
+              <li>Scrolling the planes at different speeds produces parallax — the core depth illusion of the era.</li>
+              <li>The per-tile priority bit interleaves planes (and sprites) in depth without any depth buffer.</li>
+              <li>The window is a non-scrolling cut-out of Plane A, used for HUDs and status bars.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#memory"><span class="dir">← Prev</span><span class="ttl">08 · VRAM, CRAM &amp; VSRAM</span></a>
+            <a class="next" href="#sprite-engine"><span class="dir">Next →</span><span class="ttl">10 · The sprite engine &amp; its limits</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 10 --- -->
+      <section class="doc" id="sprite-engine">
+        <div class="mod-head">
+          <span class="eye">Module 10 <span class="part-tag">· Part II</span></span>
+          <h3>The sprite engine &amp; its limits</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand the hard, visible ceilings the sprite hardware enforces per scanline — and see exactly when and why sprites vanish or flicker.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Sprites (Module 06) feel free, but the VDP builds them under a strict
+            clock. It doesn't draw sprites whole; it assembles each
+            <em>scanline</em> by walking the sprite list and fetching the tile row
+            each visible sprite contributes to <em>that line</em>. It has a fixed
+            budget of time per line, and that budget translates into two hard
+            ceilings.
+          </p>
+          <ul>
+            <li><strong>Sprites per line.</strong> In H40 (320-pixel) mode the VDP can process <strong>20 sprites</strong> on any one scanline; in H32 (256-pixel) mode, <strong>16</strong>. Sprites past that number on a line simply aren't drawn there.</li>
+            <li><strong>Sprite pixels per line.</strong> Independently, it can only fetch <strong>320 sprite-pixels</strong> of tile data per line in H40 (<strong>256</strong> in H32). Twenty small sprites or a few wide ones can hit this first.</li>
+          </ul>
+          <p>
+            Whichever ceiling you hit first, the sprites processed <em>later</em>
+            in the list drop out for that scanline — the classic
+            <span class="term" data-tip="When more sprites (or sprite-pixels) land on one scanline than the VDP can process, the surplus vanish for that line — often alternated between frames, producing flicker.">sprite overflow</span>.
+            (The total number of sprites on screen also has a cap — up to 80 in
+            H40, 64 in H32 — but the per-line limit is what you actually
+            <em>see</em>.) Games fight it constantly: they alternate which sprites
+            drop between frames, so the loss spreads out as
+            <strong>flicker</strong> rather than a permanent hole; they order the
+            sprite list so important objects come first; and they keep bosses
+            narrow on any single line. That flicker in a busy shoot-'em-up isn't a
+            bug — it's the sprite engine gracefully running out of time.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A ferry with a strict manifest</span>
+            <p>
+              A small ferry loads cars in the order they queued, until either
+              twenty cars are aboard <em>or</em> the deck's length is used up —
+              whichever comes first. Cars past the limit wait for the next
+              sailing. The VDP's scanline is that ferry: it boards
+              <span class="term" data-tip="Sprites beyond the per-line count or pixel budget don't get drawn on that scanline.">sprites</span>
+              in list order until the count or the pixel-length runs out, and the
+              rest are simply left off the line.
+            </p>
+          </div>
+
+          <p>
+            The lab makes the limit tangible. Add sprites and widen them; drag the
+            scanline (the blue bar) across the field. On that line, sprites are
+            boarded in list order until the count or the pixel budget is spent —
+            the surplus are struck out in red, exactly as the hardware would drop
+            them. Switch between H40 (20 / 320px) and H32 (16 / 256px) to feel the
+            different ceilings.
+          </p>
+
+          <div class="lab" id="lab-spriteengine">
+            <div class="lab-head"><span class="dot"></span><span class="title">Sprite-engine lab — per-scanline overflow</span><span class="badge">Canvas · live</span></div>
+            <div class="lab-body">
+              <canvas class="gfx tall cross" aria-label="A field of sprites with a draggable scanline showing per-line overflow"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Mode</label>
+                  <div class="seg-btns" data-mode role="group" aria-label="Display mode">
+                    <button class="on" data-m="h40">H40 · 20/line · 320px</button>
+                    <button data-m="h32">H32 · 16/line · 256px</button>
+                  </div>
+                </div>
+                <div class="ctrl">
+                  <label>Sprites on screen — <span class="val" data-num-val>26</span></label>
+                  <input type="range" min="4" max="40" value="26" data-num aria-label="Number of sprites">
+                </div>
+                <div class="ctrl">
+                  <label>Sprite width — <span class="val" data-w-val>2×1 cell</span></label>
+                  <input type="range" min="1" max="4" value="2" data-w aria-label="Sprite width in cells">
+                </div>
+                <div class="ctrl">
+                  <label>Scanline</label>
+                  <input type="range" min="0" max="100" value="50" data-line aria-label="Scanline position">
+                </div>
+              </div>
+              <div class="lab-readout" data-eng-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The VDP builds sprites per scanline under a fixed time budget, giving two hard ceilings.</li>
+              <li>Per line: 20 sprites (H40) / 16 (H32), and 320 sprite-pixels (H40) / 256 (H32) — whichever is hit first.</li>
+              <li>Surplus sprites drop for that line; alternating the dropouts between frames turns loss into flicker.</li>
+              <li>On-screen totals cap near 80 (H40) / 64 (H32), but the per-line limit is what players actually see.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#planes"><span class="dir">← Prev</span><span class="ttl">09 · Planes A, B &amp; the window</span></a>
+            <a class="next" href="#raster"><span class="dir">Next →</span><span class="ttl">11 · Scroll modes &amp; raster effects</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 11 --- -->
+      <section class="doc" id="raster">
+        <div class="mod-head">
+          <span class="eye">Module 11 <span class="part-tag">· Part II</span></span>
+          <h3>Scroll modes &amp; raster effects</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Go beyond whole-plane scrolling — per-cell and per-line scroll, VSRAM vertical scroll, and the mid-frame register writes that make water, splits and shimmer.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Module 05 scrolled a whole plane by one number. The VDP is far more
+            flexible than that. Horizontal scroll has <strong>three modes</strong>:
+            <em>whole plane</em> (one offset for everything), <em>per 8-pixel cell
+            row</em> (each row of cells can scroll separately), and — the powerful
+            one — <em>per scanline</em>, where <strong>every single line</strong>
+            reads its own horizontal offset from a table in VRAM. Vertical scroll
+            has two: whole plane, or <em>per 2-cell column</em>, whose offsets live
+            in that odd little 80-byte
+            <span class="term" data-tip="Vertical Scroll RAM — 80 bytes holding per-2-cell-column vertical offsets for planes A and B.">VSRAM</span>.
+          </p>
+          <p>
+            Per-line horizontal scroll is a special effect generator all by
+            itself. Feed the scroll table a sine wave and each scanline shifts a
+            little differently, so a flat plane <em>ripples</em> — instant water,
+            heat haze, or a wobbling dream sequence. Because the offsets are just a
+            table the CPU updates, the pattern can animate every frame.
+          </p>
+          <p>
+            The deeper trick is timing. Module 07's programmable
+            <span class="term" data-tip="Horizontal-blank interrupt — fires after a chosen scanline so the CPU can reprogram the VDP mid-screen.">HBlank interrupt</span>
+            lets the CPU change VDP registers <em>partway down the frame</em>.
+            Reprogram the scroll, or the palette, or the backdrop colour at line
+            120 and the top and bottom halves of the screen behave differently —
+            a <span class="term" data-tip="Changing VDP registers mid-frame (via HBlank) so different bands of the screen use different settings — e.g. a status bar that doesn't scroll, or a colour gradient.">raster split</span>.
+            This is how a status bar stays fixed while the world scrolls, how skies
+            gradient through more colours than a palette holds, and how pseudo-3D
+            road games bend the road. The whole visual vocabulary of &ldquo;the
+            Genesis doing something impossible&rdquo; is per-line scroll plus
+            mid-frame register writes.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A Venetian blind</span>
+            <p>
+              Imagine each slat of a Venetian blind showing one line of the
+              picture, and being free to slide sideways on its own. Nudge each slat
+              by a little more than the one above and the straight image bends into
+              a ripple — that's
+              <span class="term" data-tip="Every scanline reading its own horizontal scroll offset — the source of water and wobble effects.">per-line scroll</span>.
+              Now imagine reaching in halfway down and re-hanging the lower slats
+              with different settings — that's a
+              <span class="term" data-tip="A mid-frame register change (via HBlank) that makes the lower part of the screen use different scroll, colour or backdrop.">raster split</span>.
+            </p>
+          </div>
+
+          <p>
+            The lab drives a per-line horizontal scroll over a reflected scene. The
+            lower half is a mirror image whose every scanline gets a sine offset —
+            raise the amplitude and change the frequency to shape the water. This
+            is the exact effect a Genesis produces by writing a sine table into the
+            H-scroll region of VRAM.
+          </p>
+
+          <div class="lab" id="lab-raster">
+            <div class="lab-head"><span class="dot"></span><span class="title">Raster lab — per-line scroll makes water</span><span class="badge">Canvas · animated</span></div>
+            <div class="lab-body">
+              <canvas class="gfx" aria-label="A reflected scene rippling via per-scanline horizontal scroll"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Ripple amplitude — <span class="val" data-amp-val>6 px</span></label>
+                  <input type="range" min="0" max="14" value="6" data-amp aria-label="Ripple amplitude">
+                </div>
+                <div class="ctrl">
+                  <label>Ripple frequency — <span class="val" data-frq-val>0.18</span></label>
+                  <input type="range" min="5" max="40" value="18" data-frq aria-label="Ripple frequency">
+                </div>
+                <button class="play-btn" data-raster-play></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Horizontal scroll can be per-plane, per-cell-row, or per-scanline; vertical can be per-plane or per-2-cell-column (VSRAM).</li>
+              <li>Per-line horizontal scroll ripples a flat plane into water, heat haze and wobble.</li>
+              <li>The HBlank interrupt lets the CPU change registers mid-frame — a raster split — for fixed HUDs, sky gradients and road bends.</li>
+              <li>Most &ldquo;impossible&rdquo; Genesis visuals are per-line scroll plus mid-frame register writes.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#sprite-engine"><span class="dir">← Prev</span><span class="ttl">10 · The sprite engine &amp; its limits</span></a>
+            <a class="next" href="#shadow"><span class="dir">Next →</span><span class="ttl">12 · Shadow, highlight &amp; tricks</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 12 --- -->
+      <section class="doc" id="shadow">
+        <div class="mod-head">
+          <span class="eye">Module 12 <span class="part-tag">· Part II</span></span>
+          <h3>Shadow, highlight &amp; colour tricks</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how one special mode triples the palette's apparent depth — and how games squeezed more colour out of 64 entries than the numbers suggest.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Sixty-four colours (Module 03) is not many, and the VDP has a mode that
+            quietly stretches them: <span class="term" data-tip="A VDP mode giving each pixel a normal, darkened (shadow) or brightened (highlight) version of its colour — effectively tripling the palette's tonal range.">shadow/highlight</span>.
+            When enabled, every pixel can be drawn at one of three intensities —
+            <strong>normal</strong>, <strong>shadow</strong> (roughly half
+            brightness), or <strong>highlight</strong> (raised toward white). The
+            same 64 colours now cover three tonal bands, so a scene reads as having
+            far more shades than the palette literally holds — dusk, spotlights,
+            transparency-like darkening, all without spending extra CRAM entries.
+          </p>
+          <p>
+            What decides a pixel's band is a clever reuse of the
+            <strong>priority bit</strong> across planes and sprites. Low-priority
+            background under high-priority nothing falls into shadow; specific
+            sprite colours can force highlight or shadow onto whatever's beneath
+            them; and a couple of special sprite palette indices act as operators
+            rather than colours — one darkens the region it covers, another
+            brightens it. Games used sprites purely as
+            <em>shadow-casters</em>: an invisible sprite whose only job is to dim
+            the ground beneath a character into a drop shadow, or to pool light
+            under a lamp.
+          </p>
+          <p>
+            It's an approximation, and it has rules and edge cases the manuals
+            spell out in fiddly detail — but the payoff was real: transparency-like
+            effects on a machine with no true alpha blending, and a palette that
+            punches above its 64 entries. Sonic's spinning-ball translucency,
+            watery caves and moody boss arenas all lean on it.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Three exposures of one photo</span>
+            <p>
+              Take one photograph and print it three ways — normal, half-stop dark,
+              half-stop bright — then cut and collage them into a single picture.
+              You've tripled the tonal range without a single new colour of ink.
+              <span class="term" data-tip="Normal / shadow / highlight versions of the same palette, chosen per region.">Shadow/highlight</span>
+              is the VDP doing that collage per pixel, live, from one 64-colour
+              palette.
+            </p>
+          </div>
+
+          <p>
+            The lab lets you drag a zone over a colourful scene and set it to
+            shadow or highlight, then toggle the whole mode on and off. Shadow
+            halves the intensity under the zone; highlight lifts it. Same colours
+            underneath — three different tiers on top.
+          </p>
+
+          <div class="lab" id="lab-shadow">
+            <div class="lab-head"><span class="dot"></span><span class="title">Shadow / highlight lab — three tiers from one palette</span><span class="badge">Canvas · drag</span></div>
+            <div class="lab-body">
+              <canvas class="gfx grab" aria-label="A scene with a draggable shadow or highlight zone"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Zone effect</label>
+                  <div class="seg-btns" data-sh-region role="group" aria-label="Zone effect">
+                    <button class="on" data-r="shadow">shadow</button><button data-r="highlight">highlight</button>
+                  </div>
+                </div>
+                <button class="play-btn alt on" data-sh-toggle>S/H mode: ON</button>
+              </div>
+              <div class="lab-readout" data-sh-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Shadow/highlight mode draws each pixel at normal, half (shadow) or raised (highlight) intensity.</li>
+              <li>It effectively triples the tonal range of the same 64 colours — depth and transparency-like effects for free.</li>
+              <li>The priority bit and special sprite indices act as operators that darken or brighten regions beneath them.</li>
+              <li>Invisible &ldquo;shadow-caster&rdquo; sprites are how many games pooled shade under characters and lights.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#raster"><span class="dir">← Prev</span><span class="ttl">11 · Scroll modes &amp; raster effects</span></a>
+            <a class="next" href="#dma"><span class="dir">Next →</span><span class="ttl">13 · DMA &amp; the display pipeline</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 13 --- -->
+      <section class="doc" id="dma">
+        <div class="mod-head">
+          <span class="eye">Module 13 <span class="part-tag">· Part II</span></span>
+          <h3>DMA &amp; the display pipeline</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Follow how data actually gets into VRAM fast enough — the DMA engine — and how a frame's timeline splits into drawing and the precious blanking gaps.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A frame is a race against the beam. While the VDP is scanning out the
+            visible 224 lines, it needs VRAM for itself, so the CPU can only pour in
+            new tiles, maps and sprite lists during the <strong>blanking</strong>
+            periods — the short gaps when the beam is off-screen. There's a wide gap
+            each frame (<span class="term" data-tip="Vertical blanking — the ~10-line off-screen gap between frames when the beam retraces to the top; the main window for updating VRAM.">vertical blank</span>)
+            and a sliver at the end of every line (horizontal blank). Fit your
+            updates into those gaps, or you fight the VDP for the bus and corrupt
+            the display.
+          </p>
+          <p>
+            Doing that with the CPU one word at a time is far too slow for a whole
+            screen of tiles. So the VDP has a <span class="term" data-tip="Direct Memory Access — the VDP's engine that copies a block of bytes from 68000 RAM or ROM into VRAM/CRAM/VSRAM by itself, far faster than CPU writes.">DMA</span>
+            engine: tell it a source in 68000 memory, a destination in VRAM, and a
+            length, and it streams the whole block in by itself, much faster than
+            software stores. There are three flavours — a memory-to-VRAM copy (bulk
+            uploads of graphics), a VRAM-to-VRAM copy, and a fast VRAM fill. Sega's
+            &ldquo;blast processing&rdquo; slogan was, stripped of marketing,
+            largely <em>this</em>: DMA fast enough to swap big chunks of the screen
+            between frames.
+          </p>
+          <p>
+            The catch is that DMA also wants the bus, so a big transfer eats into
+            the same blanking budget — run it too long and you steal time from the
+            next frame, or must start it during VBlank precisely. Balancing DMA
+            size against the blanking window is one of the core rhythms of Genesis
+            programming, and reproducing that rhythm exactly is a real chore for
+            emulators (Module 15).
+          </p>
+
+          <div class="pipe">
+            <div class="stage"><div class="t">68000 RAM / ROM</div><div class="d">source: tiles, maps, sprites</div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">DMA engine</div><div class="d">block copy / fill, VDP-driven</div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">VRAM · CRAM · VSRAM</div><div class="d">written during blanking</div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">Compositor</div><div class="d">planes + sprites, per line</div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">TV</div><div class="d">scanned out at 60 Hz</div></div>
+          </div>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Restocking between shows</span>
+            <p>
+              A theatre can only change the set during the interval, not mid-scene.
+              <span class="term" data-tip="The off-screen periods each frame/line when the CPU or DMA may safely write video memory.">Blanking</span>
+              is that interval, and
+              <span class="term" data-tip="The engine that bulk-loads the new set in one go instead of a stagehand carrying props one by one.">DMA</span>
+              is the loading dock's forklift: instead of a stagehand walking props
+              on one at a time, it wheels the whole new backdrop in at once. But the
+              forklift blocks the corridor while it runs — take too long and you're
+              still restocking when the curtain rises.
+            </p>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The CPU/DMA can safely write video memory only during blanking, when the VDP isn't using it — mainly VBlank.</li>
+              <li>DMA copies whole blocks from 68000 memory into VRAM/CRAM/VSRAM far faster than CPU stores (three modes: copy, VRAM-copy, fill).</li>
+              <li>&ldquo;Blast processing&rdquo; was, in plain terms, DMA fast enough to swap large screen regions between frames.</li>
+              <li>DMA competes for the bus and the blanking budget — timing it against the frame is a core Genesis skill (and an emulation headache).</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#shadow"><span class="dir">← Prev</span><span class="ttl">12 · Shadow, highlight &amp; tricks</span></a>
+            <a class="next" href="#scanline"><span class="dir">Next → Part III</span><span class="ttl">14 · Scanline rendering</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART III ============ -->
+      <section class="part" id="part-3">
+        <div class="part-inner">
+          <div class="kicker">Part III</div>
+          <h3>Emulating the VDP</h3>
+          <p>
+            Finally: how does software on your PC stand in for that chip? A VDP
+            emulator has to composite planes and sprites <em>a scanline at a time</em>
+            just like the hardware, honour the sprite limits and shadow/highlight
+            rules exactly, and — hardest of all — reproduce the razor-edge timing of
+            mid-frame register writes and DMA. These three modules connect the whole
+            course to real, open-source emulators: <strong>Genesis Plus GX</strong>
+            and <strong>BlastEm</strong>.
+          </p>
+          <div class="part-meta"><span>Modules <b>14–16</b></span><span>Difficulty <b>Emulation</b></span><span>Labs <b>1 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 14 --- -->
+      <section class="doc" id="scanline">
+        <div class="mod-head">
+          <span class="eye">Module 14 <span class="part-tag">· Part III</span></span>
+          <h3>Scanline rendering</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand the heart of a VDP emulator — building the picture one scanline at a time — and why that granularity is non-negotiable.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The tempting way to emulate a 2D chip is to draw each whole plane, then
+            the sprites, then hand over a finished frame. It's simpler, faster —
+            and wrong for the Genesis. The real VDP produces the image
+            <strong>one scanline at a time</strong>, and a game can change almost
+            anything <em>between</em> lines: the scroll, the palette, the backdrop,
+            even which plane is where. An accurate emulator must therefore do the
+            same — a
+            <span class="term" data-tip="Rendering the emulated frame one horizontal line at a time, in step with the CPU, so mid-frame changes take effect on exactly the right lines.">scanline renderer</span>
+            — compositing each of the 224 lines in lockstep with the CPU, so a
+            register write on line 120 affects lines 120 onward and not a pixel
+            above.
+          </p>
+          <p>
+            Per line, the emulator does what the hardware does: read the scroll for
+            this line, fetch the right row of tiles from planes B and A, walk the
+            sprite list gathering up to the per-line budget (Module 10), resolve
+            priority and shadow/highlight per pixel, and emit 320 (or 256) finished
+            pixels. Both <strong>Genesis Plus GX</strong> and <strong>BlastEm</strong>
+            are built around exactly this loop; BlastEm goes further and models the
+            VDP at close to per-pixel <em>cycle</em> granularity, which is what lets
+            it reproduce effects that change registers <em>within</em> a single
+            line.
+          </p>
+          <p>
+            The lab below <em>is</em> a scanline renderer. Watch the raster beam
+            (the blue bar) sweep top to bottom, compositing planes and a sprite one
+            line at a time; below the beam the frame isn't drawn yet. Move the split
+            slider and a mid-frame register change repaints the backdrop from that
+            line down — precisely the mechanism a real emulator must honour to the
+            exact scanline.
+          </p>
+
+          <div class="lab" id="lab-scanline">
+            <div class="lab-head"><span class="dot"></span><span class="title">Scanline lab — draw a frame line by line</span><span class="badge">Canvas · animated</span></div>
+            <div class="lab-body">
+              <canvas class="gfx tall" aria-label="A frame drawn one scanline at a time with a raster beam and a mid-frame split"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Beam speed</label>
+                  <input type="range" min="20" max="220" value="90" data-speed aria-label="Beam speed">
+                </div>
+                <div class="ctrl">
+                  <label>Mid-frame split — <span class="val" data-split-val>line 130</span></label>
+                  <input type="range" min="20" max="210" value="130" data-split aria-label="Split scanline">
+                </div>
+                <button class="play-btn" data-scan-play></button>
+              </div>
+              <div class="lab-readout" data-scan-info></div>
+            </div>
+          </div>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A weaver at a loom</span>
+            <p>
+              A tapestry can't be reasoned about as finished cloth if the weaver
+              swaps threads mid-row. A VDP emulator is the weaver: it lays the
+              picture one row at a time, and whatever the CPU hands it before a row
+              is what that row is woven from. Skip ahead to the finished cloth and
+              you lose every mid-frame thread change — which, on the Genesis, is
+              half the artistry.
+            </p>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The VDP builds the image one scanline at a time; games change scroll, palette and backdrop between lines.</li>
+              <li>An accurate emulator composites each line in lockstep with the CPU, so mid-frame writes land on the right lines.</li>
+              <li>Per line it reads scroll, fetches plane rows, gathers sprites under the per-line budget, and resolves priority + shadow/highlight.</li>
+              <li>Genesis Plus GX and BlastEm are built on this loop; BlastEm models near per-pixel timing for within-line effects.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#dma"><span class="dir">← Prev · Part II</span><span class="ttl">13 · DMA &amp; the display pipeline</span></a>
+            <a class="next" href="#hardparts"><span class="dir">Next →</span><span class="ttl">15 · The hard parts</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 15 --- -->
+      <section class="doc" id="hardparts">
+        <div class="mod-head">
+          <span class="eye">Module 15 <span class="part-tag">· Part III</span></span>
+          <h3>The hard parts</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Tour the places where faithful VDP emulation genuinely fights — mid-line register changes, DMA timing, sprite-overflow accuracy and the CPU/VDP bus dance.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Scanline rendering (Module 14) gets you a long way. The remaining
+            difficulty is almost all <em>timing</em>: games were written against
+            the VDP's exact clock, and cutting corners on when things happen breaks
+            the very effects that make Genesis games look special.
+          </p>
+
+          <h4>1 · Mid-line register changes</h4>
+          <p>
+            The nastiest case: a game changes a VDP register <em>partway across a
+            single scanline</em>, so the left of a line uses one scroll or palette
+            and the right uses another. A renderer that only re-reads state at the
+            <em>start</em> of each line gets these wrong. Faithfully handling them
+            means stepping the VDP and CPU in lockstep at close to pixel
+            granularity — the reason <span class="term" data-tip="An open-source Genesis emulator focused on cycle-accurate 68000/Z80/VDP timing.">BlastEm</span>
+            exists and is built the way it is. Genesis Plus GX handles the common
+            cases well; the exotic ones are where accuracy projects earn their keep.
+          </p>
+
+          <h4>2 · DMA timing &amp; the FIFO</h4>
+          <p>
+            Module 13's DMA has to be modelled with its real cost: it steals bus
+            cycles, its rate differs during active display versus blanking, and the
+            VDP's write
+            <span class="term" data-tip="A small queue in the VDP buffering pending writes to video memory; overruning it stalls the CPU. Its timing affects how much a game can transfer per frame.">FIFO</span>
+            can stall the CPU when it fills. Get the DMA rate slightly wrong and a
+            game either uploads more than the hardware could — showing graphics too
+            early — or corrupts VRAM because the emulator let a write land while the
+            real VDP would have been busy.
+          </p>
+
+          <h4>3 · Sprite-overflow &amp; masking accuracy</h4>
+          <p>
+            Module 10's limits must be reproduced <em>exactly</em>, including the
+            order sprites drop, the sprite-masking rules (special sprites at x=0 that
+            hide others), and the overflow flag games read. Get it merely
+            &ldquo;close&rdquo; and flicker patterns differ, or a game that uses a
+            masking sprite to hide the status area leaks graphics. These are the
+            corner cases regression-tested against real hardware captures.
+          </p>
+
+          <h4>4 · The CPU/VDP bus dance</h4>
+          <p>
+            The 68000 and VDP share a bus, and the exact stall a CPU write incurs
+            when the VDP is busy is observable — some games <em>time</em> code by it.
+            Model the arbitration too loosely and timing-sensitive intros, raster
+            splits and sample playback drift out of sync.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Dubbing a film frame-accurate</span>
+            <p>
+              Re-recording a film's soundtrack is easy until you must match lip
+              movements to the exact frame. VDP emulation is the same: drawing the
+              right pixels is the easy 90%; making every register write, DMA burst
+              and bus stall land on the exact cycle — so the lips match — is the
+              stubborn last 10% that separates &ldquo;runs&rdquo; from
+              &ldquo;accurate.&rdquo;
+            </p>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The residual difficulty is timing: games depend on <em>when</em> the VDP does things, not just what.</li>
+              <li>Mid-line register changes demand near per-pixel CPU/VDP stepping — BlastEm's reason for being.</li>
+              <li>DMA cost, rate and the write FIFO must be modelled, or transfers desync and VRAM corrupts.</li>
+              <li>Sprite overflow order, masking and flags, and CPU-write bus stalls, are all observable and must match hardware.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#scanline"><span class="dir">← Prev</span><span class="ttl">14 · Scanline rendering</span></a>
+            <a class="next" href="#try"><span class="dir">Next →</span><span class="ttl">16 · Try it in an emulator</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 16 --- -->
+      <section class="doc" id="try">
+        <div class="mod-head">
+          <span class="eye">Module 16 <span class="part-tag">· Part III</span></span>
+          <h3>Try it in an emulator</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Turn the whole course into things you can now see and poke in a real emulator's debugger — and recap the journey of a Genesis pixel.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            You now have the full picture, so let's make it hands-on. Open a
+            debugging-friendly emulator — <strong>Genesis Plus GX</strong> (its
+            debug/libretro builds) or <strong>BlastEm</strong> (whose built-in
+            debugger is superb) — and read a running game with this course's eyes.
+          </p>
+          <ul>
+            <li><strong>VRAM / tile viewer</strong> — see Module 02's raw 8×8 patterns laid out in the 64&nbsp;KB of VRAM. Watch them change as the game DMAs new graphics in (Module 13).</li>
+            <li><strong>Nametable / plane viewer</strong> — Module 04 and 09 made visible: inspect planes A and B, the window, and how scroll offsets slide them.</li>
+            <li><strong>CRAM / palette viewer</strong> — the four lines of 16 from Module 03, updating live; watch palette cycling and mid-frame palette splits.</li>
+            <li><strong>Sprite viewer</strong> — the attribute table from Module 06, the link order, sizes and priorities; a good viewer flags per-line overflow (Module 10).</li>
+            <li><strong>Register &amp; raster view</strong> — where the VDP's two dozen registers live, and (in BlastEm) how they change per scanline — Module 11's raster effects, caught in the act.</li>
+            <li><strong>DMA / bus trace</strong> — Module 13 as a timeline: when transfers fire, how long they take, how they fit the blanking window.</li>
+          </ul>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The cockpit after the hangar tour</span>
+            <p>
+              An emulator's debugger looks like a wall of arbitrary panes — until
+              you've walked the hangar and seen the tiles, planes, palettes and
+              sprites each pane shows. You've just walked the VDP's hangar. Every
+              window in that debugger is wired to a module you've now touched.
+            </p>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 210" role="img" aria-label="The full Genesis pixel pipeline mapped to the modules of this course">
+              <text x="24" y="30" class="d-tag d-blue">the whole course in one row</text>
+              <rect x="20" y="46" width="118" height="66" rx="9" class="d-fill-panel d-red-s" stroke-width="1.5"/>
+              <text x="79" y="74" text-anchor="middle" class="d-label" style="font-size:12.5px">tiles</text>
+              <text x="79" y="94" text-anchor="middle" class="d-sub">Mod 02</text>
+              <line x1="138" y1="79" x2="158" y2="79" class="d-axis" stroke-width="1.8"/>
+              <rect x="160" y="46" width="118" height="66" rx="9" class="d-fill-panel d-gold-s" stroke-width="1.5"/>
+              <text x="219" y="74" text-anchor="middle" class="d-label" style="font-size:12.5px">palette</text>
+              <text x="219" y="94" text-anchor="middle" class="d-sub">Mod 03</text>
+              <line x1="278" y1="79" x2="298" y2="79" class="d-axis" stroke-width="1.8"/>
+              <rect x="300" y="46" width="118" height="66" rx="9" class="d-fill-panel d-blue-s" stroke-width="1.5"/>
+              <text x="359" y="74" text-anchor="middle" class="d-label" style="font-size:12.5px">planes</text>
+              <text x="359" y="94" text-anchor="middle" class="d-sub">Mod 04·09</text>
+              <line x1="418" y1="79" x2="438" y2="79" class="d-axis" stroke-width="1.8"/>
+              <rect x="440" y="46" width="118" height="66" rx="9" class="d-fill-panel d-red-s" stroke-width="1.5"/>
+              <text x="499" y="74" text-anchor="middle" class="d-label" style="font-size:12.5px">sprites</text>
+              <text x="499" y="94" text-anchor="middle" class="d-sub">Mod 06·10</text>
+              <line x1="558" y1="79" x2="578" y2="79" class="d-axis" stroke-width="1.8"/>
+              <rect x="580" y="46" width="118" height="66" rx="9" class="d-fill-panel d-gold-s" stroke-width="1.5"/>
+              <text x="639" y="74" text-anchor="middle" class="d-label" style="font-size:12.5px">raster/S·H</text>
+              <text x="639" y="94" text-anchor="middle" class="d-sub">Mod 11·12</text>
+              <line x1="698" y1="79" x2="718" y2="79" class="d-axis" stroke-width="1.8"/>
+              <rect x="720" y="46" width="160" height="66" rx="9" class="d-fill-panel d-stroke-line" stroke-width="1.5"/>
+              <text x="800" y="74" text-anchor="middle" class="d-label" style="font-size:12.5px">scanline → TV</text>
+              <text x="800" y="94" text-anchor="middle" class="d-sub">Mod 14</text>
+              <text x="79" y="140" text-anchor="middle" class="d-flow">tile viewer</text>
+              <text x="219" y="140" text-anchor="middle" class="d-flow d-gold">CRAM view</text>
+              <text x="359" y="140" text-anchor="middle" class="d-flow d-blue">plane view</text>
+              <text x="499" y="140" text-anchor="middle" class="d-flow d-red">sprite view</text>
+              <text x="639" y="140" text-anchor="middle" class="d-flow d-gold">register/raster</text>
+              <text x="800" y="140" text-anchor="middle" class="d-flow">frame debugger</text>
+              <text x="24" y="184" class="d-sub">every debugger pane maps to a module you've walked — you can now predict what each shows and why</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Pipeline, mapped.</strong> Tiles → palette → planes → sprites → raster/shadow-highlight → scanline scan-out, with the emulator debugger view that shows each stage underneath. Reading the debugger is now just reading this diagram.</figcaption>
+          </figure>
+
+          <p>
+            A great closing exercise: load a game with obvious parallax, open the
+            plane viewer, and watch planes A and B scroll at different speeds
+            (Module 09). Then find a water level and open the raster/register view to
+            catch the per-line scroll table rippling (Module 11). Finally, step a
+            frame and watch the scanline counter tick — you're no longer staring at
+            mystery windows; you're watching a pipeline you know stage by stage.
+          </p>
+
+          <div class="takeaway">
+            <div class="th">Course complete ✦</div>
+            <ul>
+              <li>You can follow a Genesis pixel from a 4-bit tile index to a colour to a composited scanline on a CRT.</li>
+              <li>You know the VDP's three memories, its two planes and window, its sprite limits, and its raster and colour tricks.</li>
+              <li>You can read an emulator's VRAM, plane, CRAM, sprite and register views as a live map of everything in Parts I and II.</li>
+              <li>Grounded throughout in the open-source emulators Genesis Plus GX and BlastEm — go run one and poke it.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#hardparts"><span class="dir">← Prev</span><span class="ttl">15 · The hard parts</span></a>
+            <a class="next" href="#pixels"><span class="dir">↺ Restart</span><span class="ttl">01 · Pictures as pixels</span></a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <p>
+          An interactive course on the Sega Genesis / Mega Drive video hardware.
+          Every picture on this page is drawn procedurally in your browser — the
+          labs are little software VDPs implementing the very algorithms they
+          teach. This page contains <strong>no game artwork</strong>. Hardware
+          details are grounded in public documentation and the open-source
+          emulators <strong>Genesis Plus GX</strong> and <strong>BlastEm</strong>
+          (with <strong>Nuked-OPN2</strong> the reference for the YM2612 FM sound
+          chip, covered in a sibling course); where exact figures vary by source or
+          mode, the text says so.
+        </p>
+        <p class="src">
+          &ldquo;Genesis&rdquo;, &ldquo;Mega Drive&rdquo; and &ldquo;Sega&rdquo; are
+          trademarks of Sega. This is an independent, non-commercial educational
+          project, not affiliated with or endorsed by Sega.
+        </p>
+      </footer>
+
+    </div><!-- /wrap -->
+  </main>
+</div><!-- /app -->
+
+<script src="app.js"></script>
+</body>
+</html>
