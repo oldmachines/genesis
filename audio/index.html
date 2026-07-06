@@ -1,0 +1,1656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Genesis Audio — FM synthesis, the YM2612 &amp; the PSG</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%23ff5347%27/%3E%3Crect x=%276%27 y=%278%27 width=%2720%27 height=%275%27 rx=%272%27 fill=%27%230a0b10%27/%3E%3C/svg%3E">
+<meta name="description" content="A hands-on course in three parts: sound synthesis from scratch, how the Sega Genesis makes sound with the YM2612 FM chip and the SN76489 PSG, and how emulators like Genesis Plus GX, BlastEm and Nuked-OPN2 reproduce it — with a built-in synthesiser so you can hear every idea.">
+<link rel="stylesheet" href="styles.css?v=20260706a">
+</head>
+<body>
+
+<div class="progress" aria-hidden="true"><div class="fill" id="progress-fill"></div></div>
+<button class="menu-btn" id="menu-btn" aria-label="Open contents">☰</button>
+<div class="scrim" id="scrim"></div>
+
+<div class="app">
+
+  <!-- ================================================= SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Genesis Audio</h1>
+        <span class="sub">A course · 16 modules</span>
+      </div>
+    </div>
+
+    <nav class="toc" aria-label="Course contents">
+      <div class="toc-group">Part I · Sound from zero</div>
+      <a href="#waves"><span class="n">01</span><span>What sound is</span></a>
+      <a href="#pitch"><span class="n">02</span><span>Pitch &amp; the scale</span></a>
+      <a href="#additive"><span class="n">03</span><span>Additive &amp; harmonics</span></a>
+      <a href="#fm"><span class="n">04</span><span>FM: the big idea</span></a>
+      <a href="#envelope"><span class="n">05</span><span>Envelopes (ADSR)</span></a>
+      <a href="#noise"><span class="n">06</span><span>Noise &amp; percussion</span></a>
+
+      <div class="toc-group">Part II · The Genesis chips</div>
+      <a href="#ym2612"><span class="n">07</span><span>Meet the YM2612</span></a>
+      <a href="#algorithms"><span class="n">08</span><span>Operators &amp; 8 algorithms</span></a>
+      <a href="#envelopes2"><span class="n">09</span><span>The YM2612 envelope</span></a>
+      <a href="#lfo-dac"><span class="n">10</span><span>LFO, feedback &amp; DAC</span></a>
+      <a href="#psg"><span class="n">11</span><span>The SN76489 PSG</span></a>
+      <a href="#z80"><span class="n">12</span><span>The Z80 sound driver</span></a>
+
+      <div class="toc-group">Part III · Emulating the chips</div>
+      <a href="#nuked"><span class="n">13</span><span>Nuked-OPN2</span></a>
+      <a href="#quirks"><span class="n">14</span><span>The hard parts</span></a>
+      <a href="#psg-mix"><span class="n">15</span><span>PSG emulation &amp; mixing</span></a>
+      <a href="#try"><span class="n">16</span><span>Try it in an emulator</span></a>
+
+      <div class="progress-note">Progress · <b id="pct">0%</b></div>
+    </nav>
+  </aside>
+
+  <!-- ================================================= MAIN =============== -->
+  <main class="main">
+
+    <!-- ------------------------------------------------ HERO -------------- -->
+    <header class="hero">
+      <canvas id="hero-scope" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <div class="inner">
+          <span class="eyebrow">An interactive course · Genesis Plus GX &amp; BlastEm</span>
+          <h2>How the <span class="grad">Genesis</span> made sound.</h2>
+          <p class="lede">
+            We start from the very beginning — what a sound signal even <em>is</em> —
+            assuming you know nothing about synthesis. Once the vocabulary is solid we
+            meet the Sega Genesis' two sound chips: Yamaha's four-operator
+            <strong>FM synthesiser</strong>, the YM2612, and the little
+            <strong>PSG</strong> that beeps under it. Sixteen modules, each with a
+            <strong>live synthesiser</strong> so you can hear every idea, not just read
+            it. No game audio ships with this page; every sound is generated in your
+            browser.
+          </p>
+          <div class="cta-row">
+            <a class="btn primary" href="#waves">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Begin Part I
+            </a>
+            <button class="btn" id="play-chord">Hear an FM chord</button>
+          </div>
+
+          <div class="arc-cards">
+            <a class="arc" href="#part-1">
+              <div class="an">PART I</div>
+              <h4>Sound from zero</h4>
+              <p>Waves, pitch, harmonics, FM, envelopes and noise — the universal vocabulary of synthesis, explained from nothing.</p>
+              <div class="cnt">6 modules · with labs</div>
+            </a>
+            <a class="arc" href="#part-2">
+              <div class="an">PART II</div>
+              <h4>The Genesis chips</h4>
+              <p>The YM2612 FM chip — 6 channels, 4 operators, 8 algorithms — the SN76489 PSG, and the Z80 that drives them.</p>
+              <div class="cnt">6 modules · with labs</div>
+            </a>
+            <a class="arc" href="#part-3">
+              <div class="an">PART III</div>
+              <h4>Emulating the chips</h4>
+              <p>Nuked-OPN2, the notorious YM2612 quirks, PSG mixing, and the settings you toggle in a real emulator.</p>
+              <div class="cnt">4 modules</div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+
+      <!-- ============================================ PART I ============== -->
+      <section class="part" id="part-1">
+        <div class="part-inner">
+          <div class="kicker">Part I</div>
+          <h3>Sound from zero</h3>
+          <p>
+            This first part is pure fundamentals — nothing about any specific chip
+            yet. It's the toolkit that <em>every</em> synthesiser is built from,
+            whether that's a modular wall of cables, a phone, or the Yamaha chip we'll
+            meet in Part II. We build the vocabulary one word at a time — wave, pitch,
+            harmonic, modulation, envelope, noise — and you can play and see each idea
+            with a synthesised tone. The star of the whole course, <strong>FM
+            synthesis</strong>, lives right here in Module 04; everything in Parts II
+            and III is these six ideas wired into silicon.
+          </p>
+          <div class="part-meta"><span>Modules <b>01–06</b></span><span>Difficulty <b>Absolute beginner</b></span><span>Labs <b>6 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 01 --- -->
+      <section class="doc" id="waves">
+        <div class="mod-head">
+          <span class="eye">Module 01 <span class="part-tag">· Part I</span></span>
+          <h3>What sound is — waves &amp; samples</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand, from scratch, what a sound physically is, and how a chip turns a wave into something you can hear.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Let's start with what sound physically is. When something vibrates — a
+            guitar string, your vocal cords, a speaker cone — it pushes and pulls on
+            the surrounding air, creating tiny, fast changes in air pressure. Those
+            pressure changes ripple outward as a <strong>wave</strong> and reach your
+            eardrum, which vibrates in step. That's all sound is: a wobble in air
+            pressure over time.
+          </p>
+          <p>
+            A synthesiser's job is to <em>generate</em> that wobble electrically —
+            a voltage (or, in a chip, a stream of numbers) that swings up and down
+            many thousands of times per second, which a speaker then turns back into
+            moving air. How far the wave swings from its resting point is its
+            <strong>amplitude</strong> — that's loudness. How many times it repeats
+            per second is its <strong>frequency</strong>, measured in
+            <strong>hertz</strong> (Hz): 440&nbsp;Hz means 440 complete cycles every
+            second. Higher frequency = higher pitch.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A skipping rope</span>
+            <p>
+              Wiggle one end of a rope and a wave travels along it. Wiggle
+              <em>faster</em> and the waves bunch up — higher
+              <span class="term" data-tip="How many times a wave repeats per second, measured in hertz (Hz). Higher frequency = higher pitch.">frequency</span>,
+              higher pitch. Wiggle <em>harder</em> and the wave gets taller — bigger
+              <span class="term" data-tip="How far a wave swings from its resting point. Bigger amplitude = louder.">amplitude</span>,
+              louder. Frequency and amplitude are the only two things a single tone
+              really has; everything else is the wave's <em>shape</em>.
+            </p>
+          </div>
+
+          <p>
+            And shape is what makes one sound different from another. Play a flute and
+            a trumpet at the same pitch and they still sound different because their
+            pressure waves have different shapes. That shape is the
+            <strong>waveform</strong>, and the character it gives — reedy, bright,
+            hollow, harsh — is the <strong>timbre</strong> (say &ldquo;TAM-ber&rdquo;).
+            A few shapes are so basic they have names, and every synthesiser starts
+            from them:
+          </p>
+          <ul>
+            <li><strong>Sine</strong> — the purest possible tone, a single smooth frequency with no extra colour. A tuning fork or a gentle whistle. This one shape is the seed of <em>all</em> FM synthesis (Module 04).</li>
+            <li><strong>Square</strong> and <strong>saw(tooth)</strong> — jagged shapes that are secretly a sine plus a stack of higher tones piled on top. Bright and buzzy — the classic Genesis PSG &ldquo;bleep.&rdquo;</li>
+            <li><strong>Triangle</strong> — in between: a little richer than a sine, but still mellow.</li>
+            <li><strong>Noise</strong> — every frequency at once, no pitch at all. Your &ldquo;shh&rdquo; sound: wind, static, a hi-hat, an explosion.</li>
+          </ul>
+          <p>
+            Play with the scope below: switch the shape, sweep the frequency slider,
+            and watch the trace change while you listen. The moving line is an
+            <strong>oscilloscope</strong> — it draws amplitude (up/down) against time
+            (left/right), so you're literally seeing the wave.
+          </p>
+
+          <div class="lab" id="lab-wave">
+            <div class="lab-head"><span class="dot"></span><span class="title">Signal lab — waveforms on a scope</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <canvas class="scope" aria-label="Oscilloscope trace of the selected waveform"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Waveform</label>
+                  <div class="seg-btns" role="group" aria-label="Waveform">
+                    <button class="on" data-shape="sine">sine</button>
+                    <button data-shape="square">square</button>
+                    <button data-shape="sawtooth">saw</button>
+                    <button data-shape="triangle">tri</button>
+                    <button data-shape="noise">noise</button>
+                  </div>
+                </div>
+                <div class="ctrl">
+                  <label>Frequency — <span class="val" data-wave-freq-val>220 Hz</span></label>
+                  <input type="range" min="55" max="1760" value="220" step="1" data-wave-freq aria-label="Frequency">
+                </div>
+                <button class="play-btn" data-wave-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Sound is a pressure wave; a synth generates that wave electrically and a speaker turns it back into air.</li>
+              <li>A tone has two numbers: amplitude (loudness) and frequency (pitch, in Hz).</li>
+              <li>Waveform shape = harmonic content = timbre — why a flute ≠ a trumpet ≠ a square wave.</li>
+              <li>The sine is the seed FM builds everything from; the square is the PSG's signature.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a class="disabled" aria-disabled="true"><span class="dir">← Prev</span><span class="ttl">Start of course</span></a>
+            <a class="next" href="#pitch"><span class="dir">Next →</span><span class="ttl">02 · Pitch &amp; the scale</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 02 --- -->
+      <section class="doc" id="pitch">
+        <div class="mod-head">
+          <span class="eye">Module 02 <span class="part-tag">· Part I</span></span>
+          <h3>Pitch, octaves &amp; the tempered scale</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Turn raw frequencies into musical notes: what an octave is, why twelve semitones, and how a chip stores a pitch.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Module 01 measured pitch as a plain frequency in hertz. Music organises
+            those frequencies into <strong>notes</strong>, and the organising trick is
+            beautifully simple: <em>double the frequency and you get the same note, one
+            <strong>octave</strong> higher.</em> 220&nbsp;Hz, 440&nbsp;Hz and
+            880&nbsp;Hz are all the note &ldquo;A&rdquo; — our ears hear a doubling as
+            &ldquo;the same, but higher.&rdquo; That's why frequency feels
+            <em>multiplicative</em>, not additive: each octave up is a ×2.
+          </p>
+          <p>
+            Western music slices each octave into <strong>twelve</strong> equal steps
+            called <strong>semitones</strong>. &ldquo;Equal&rdquo; here means equal
+            <em>ratios</em>, not equal hertz: each semitone multiplies the frequency by
+            the twelfth root of two (about <strong>1.0595</strong>). Do that twelve
+            times and you've multiplied by 2 — exactly one octave. This scheme is
+            called <span class="term" data-tip="Tuning where every semitone is the same frequency ratio (the 12th root of 2), so music sounds the same in any key.">equal temperament</span>,
+            and it's why a tune sounds right whether you start it high or low.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A ruler that stretches</span>
+            <p>
+              On a piano the low notes are spaced far apart in hertz and the high notes
+              are crammed together — yet they <em>feel</em> evenly spaced. Pitch is
+              like a ruler whose marks get wider as you go up, because each step is a
+              multiply, not an add. An
+              <span class="term" data-tip="A doubling of frequency; the same note, higher. 220 Hz and 440 Hz are both 'A'.">octave</span>
+              is always ×2, no matter where on the ruler you stand.
+            </p>
+          </div>
+
+          <p>
+            A sound chip doesn't think in hertz at all. It holds a
+            <strong>frequency number</strong> that sets how fast an internal counter
+            advances; a bigger number plays a higher note. On the Genesis' FM chip that
+            value is an 11-bit <em>F-number</em> plus a 3-bit <em>block</em> (octave),
+            so a driver picks a note by looking up its F-number and octave in a table —
+            the same twelve ratios you just met, pre-computed. Play the keyboard below:
+            each key is one semitone, and the whole thing is just those ratios turned
+            into tones.
+          </p>
+
+          <div class="lab" id="lab-pitch">
+            <div class="lab-head"><span class="dot"></span><span class="title">Keyboard — one octave of equal temperament</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <div class="piano" data-piano aria-label="Playable one-octave keyboard"></div>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Tone</label>
+                  <div class="seg-btns" role="group" aria-label="Keyboard tone">
+                    <button class="on" data-pkey-shape="triangle">soft</button>
+                    <button data-pkey-shape="square">square (PSG)</button>
+                    <button data-pkey-shape="fm">FM bell</button>
+                  </div>
+                </div>
+                <span style="font-size:12.5px;color:var(--muted)">Click or tap the keys. Each white/black key is one semitone — a ×1.0595 step in frequency.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>An octave is a frequency doubling; the same note, higher.</li>
+              <li>Twelve equal semitones per octave, each a ×1.0595 ratio — equal temperament.</li>
+              <li>A chip stores pitch as a frequency number (FM: an F-number + octave block), not hertz.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#waves"><span class="dir">← Prev</span><span class="ttl">01 · What sound is</span></a>
+            <a class="next" href="#additive"><span class="dir">Next →</span><span class="ttl">03 · Additive &amp; harmonics</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 03 --- -->
+      <section class="doc" id="additive">
+        <div class="mod-head">
+          <span class="eye">Module 03 <span class="part-tag">· Part I</span></span>
+          <h3>Additive synthesis &amp; harmonics</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See that every sound is a stack of pure sine waves, and build a tone by hand from its harmonics — the idea FM will turn on its head.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            In Module 01 we said a square or saw is &ldquo;secretly a sine plus higher
+            tones.&rdquo; That wasn't a metaphor. The mathematician Fourier proved a
+            remarkable fact: <strong>any sound, however complex, is just a sum of pure
+            sine waves at different frequencies and volumes.</strong> Pull any tone
+            apart and you always find sines; add the right sines together and you can
+            build <em>any</em> waveform. Building sound by stacking sines is called
+            <strong>additive synthesis</strong>.
+          </p>
+          <p>
+            For a musical note the sines aren't random. They sit at whole-number
+            multiples of the lowest one: if the <strong>fundamental</strong> (the pitch
+            you hear) is 220&nbsp;Hz, the stack sits at 440, 660, 880&nbsp;Hz and so on.
+            Those multiples are the <span class="term" data-tip="Whole-number multiples of the fundamental frequency (2×, 3×, 4×…). Their pattern and strength define a sound's timbre.">harmonics</span>,
+            and their pattern <em>is</em> the timbre. A saw contains every harmonic
+            fading gently; a square contains only the odd ones (1×, 3×, 5×…), which
+            gives it that hollow, clarinet-ish honk.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A recipe</span>
+            <p>
+              A finished cake tastes of everything at once. The
+              <em>recipe</em> lists the ingredients — two eggs, a cup of flour. The
+              <span class="term" data-tip="A picture of how much of each frequency a sound contains — its recipe of sine ingredients.">spectrum</span>
+              is a sound's recipe: how much of each harmonic went in. Change the
+              amounts and you change the flavour — the timbre — without changing the
+              note.
+            </p>
+          </div>
+
+          <p>
+            The catch with pure additive synthesis is <em>cost</em>: a rich, evolving
+            tone can need dozens of sines, each with its own volume changing over time.
+            That's a lot of oscillators. This is exactly the problem FM synthesis
+            (next module) solves so cleverly — it manufactures a whole forest of
+            harmonics from just <em>two</em> oscillators. But first, feel additive
+            synthesis directly. Drag the harmonic sliders below to mix your own tone;
+            the scope shows the wave you're building and the spectrum shows your recipe.
+          </p>
+
+          <div class="lab" id="lab-additive">
+            <div class="lab-head"><span class="dot"></span><span class="title">Additive lab — stack the harmonics yourself</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <div class="spectrum-grid">
+                <canvas class="scope" aria-label="Oscilloscope of the built-up wave"></canvas>
+                <canvas class="spectrum" aria-label="Spectrum of the built-up wave"></canvas>
+              </div>
+              <div class="harm-sliders" data-harm-sliders aria-label="Harmonic amplitude sliders"></div>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Presets</label>
+                  <div class="seg-btns" role="group" aria-label="Presets">
+                    <button data-harm-preset="sine">sine</button>
+                    <button class="on" data-harm-preset="saw">saw</button>
+                    <button data-harm-preset="square">square</button>
+                    <button data-harm-preset="organ">organ</button>
+                  </div>
+                </div>
+                <button class="play-btn" data-additive-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play
+                </button>
+                <span style="font-size:12.5px;color:var(--muted)">Slider 1 = fundamental · 2–8 = harmonics. Watch the wave and its recipe change together.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Any sound is a sum of pure sine waves (Fourier's idea).</li>
+              <li>For a note those sines are the harmonics: whole-number multiples of the fundamental.</li>
+              <li>The pattern and strength of harmonics <em>is</em> the timbre; the spectrum is a sound's recipe.</li>
+              <li>Additive synthesis is powerful but expensive — which is exactly why FM was invented.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#pitch"><span class="dir">← Prev</span><span class="ttl">02 · Pitch &amp; the scale</span></a>
+            <a class="next" href="#fm"><span class="dir">Next →</span><span class="ttl">04 · FM: the big idea</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 04 --- -->
+      <section class="doc" id="fm">
+        <div class="mod-head">
+          <span class="eye">Module 04 <span class="part-tag">· Part I</span></span>
+          <h3>FM synthesis — the big idea</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand the trick at the heart of the whole Genesis sound: use one oscillator to wobble another's pitch, and get a fountain of harmonics for free.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Here is the idea that defines this course. Take two sine oscillators. Call
+            one the <strong>carrier</strong> — it's the one you actually hear. Call the
+            other the <strong>modulator</strong>. Now, instead of letting the carrier
+            play a steady pitch, use the modulator's output to <em>wobble the carrier's
+            frequency</em> up and down, very fast. That's it. That's
+            <strong>frequency modulation</strong> — <strong>FM</strong> synthesis,
+            discovered by John Chowning at Stanford and licensed to Yamaha, who put it
+            in the chip inside your Genesis.
+          </p>
+          <p>
+            Why is that powerful? Because when you wobble a sine's pitch fast enough,
+            the ear stops hearing &ldquo;wobble&rdquo; and starts hearing new
+            <span class="term" data-tip="Whole-number multiples of the fundamental. FM manufactures whole stacks of them from just two oscillators.">harmonics</span>
+            — a rich, buzzy, metallic spectrum that a plain sine never had. Two
+            oscillators do the work that additive synthesis (Module 03) needed dozens
+            for. Two numbers steer the whole sound:
+          </p>
+          <div class="defs">
+            <div class="row"><dt>Ratio</dt><dd>The modulator's frequency divided by the carrier's. A <em>whole-number</em> ratio (2:1, 3:1) gives harmonic, musical tones; a non-integer ratio (2.4:1) gives clangy, bell-like, or noisy metallic sounds.</dd></div>
+            <div class="row"><dt>Index</dt><dd>How <em>hard</em> the modulator pushes — the depth of the wobble. Low index = nearly a pure sine; crank it up and more, higher harmonics appear and the tone gets brighter and buzzier.</dd></div>
+          </div>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A singer's vibrato gone wild</span>
+            <p>
+              A singer adding gentle <em>vibrato</em> wavers their pitch a few times a
+              second — you still hear one note, just warmer. Now imagine wavering the
+              pitch <em>hundreds</em> of times a second: it stops sounding like a
+              wavering note and starts sounding like a completely new, brighter
+              instrument. The
+              <span class="term" data-tip="The modulator frequency ÷ carrier frequency. Whole numbers sound musical; odd ratios sound bell-like or metallic.">ratio</span>
+              sets how fast the waver is; the
+              <span class="term" data-tip="How deeply the modulator bends the carrier's pitch. More index = brighter, buzzier, more harmonics.">index</span>
+              sets how wide. That runaway vibrato <em>is</em> FM.
+            </p>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 210" role="img" aria-label="A modulator oscillator bending a carrier oscillator's frequency to produce a rich output">
+              <rect x="60" y="70" width="150" height="70" rx="10" class="d-fill-panel2 d-blue-s" stroke-width="1.6"/>
+              <text x="135" y="100" text-anchor="middle" class="d-label" style="font-size:14px">Modulator</text>
+              <text x="135" y="120" text-anchor="middle" class="d-sub">a sine · sets ratio</text>
+              <line x1="210" y1="105" x2="300" y2="105" class="d-axis" stroke-width="2" marker-end="url(#fmar)"/>
+              <text x="255" y="94" text-anchor="middle" class="d-flow d-gold">× index</text>
+              <rect x="302" y="70" width="150" height="70" rx="10" class="d-fill-panel2 d-red-s" stroke-width="1.6"/>
+              <text x="377" y="100" text-anchor="middle" class="d-label" style="font-size:14px">Carrier</text>
+              <text x="377" y="120" text-anchor="middle" class="d-sub">freq wobbled fast</text>
+              <line x1="452" y1="105" x2="560" y2="105" class="d-axis" stroke-width="2" marker-end="url(#fmar)"/>
+              <polyline class="d-wave-r" points="565,105 575,80 585,130 595,72 605,138 615,85 625,120 635,70 645,140 655,95 665,112 675,78 685,132 695,105"/>
+              <text x="620" y="60" text-anchor="middle" class="d-tag d-red">rich output</text>
+              <text x="620" y="176" text-anchor="middle" class="d-sub">many harmonics from just two sines</text>
+              <defs><marker id="fmar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker></defs>
+            </svg>
+            <figcaption class="fig-cap"><strong>Frequency modulation.</strong> The modulator's sine bends the carrier's frequency; the depth of that bend is the <strong>index</strong>, and the pitch relationship between the two is the <strong>ratio</strong>. Out comes a spectrum full of harmonics — the entire foundation of the YM2612.</figcaption>
+          </figure>
+
+          <p>
+            Play with the two-operator FM lab below — this is the single most important
+            lab in the course. Drag <strong>ratio</strong> and <strong>index</strong>
+            while it plays and watch the spectrum on the right sprout new harmonics in
+            real time. Try ratio 1 and 2 (warm, musical), then a non-integer like 1.41
+            (clangy bell), and slide the index from 0 (pure sine) to full (harsh buzz).
+            Everything the YM2612 does is <em>this</em>, four oscillators deep.
+          </p>
+
+          <div class="lab" id="lab-fm">
+            <div class="lab-head"><span class="dot"></span><span class="title">Two-operator FM — drag ratio &amp; index, hear + see it</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <div class="spectrum-grid">
+                <canvas class="scope" aria-label="Oscilloscope of the FM tone"></canvas>
+                <canvas class="spectrum" aria-label="Spectrum of the FM tone"></canvas>
+              </div>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Ratio (mod : carrier) — <span class="val" data-fm-ratio-val>2.00</span></label>
+                  <input type="range" min="0.25" max="6" value="2" step="0.01" data-fm-ratio aria-label="FM ratio">
+                </div>
+                <div class="ctrl">
+                  <label>Index (depth) — <span class="val" data-fm-index-val>4.0</span></label>
+                  <input type="range" min="0" max="12" value="4" step="0.1" data-fm-index aria-label="FM index">
+                </div>
+                <button class="play-btn" data-fm-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play &amp; drag
+                </button>
+                <span style="font-size:12.5px;color:var(--muted)">Sliders update the sound <em>live</em>. Whole ratios → musical · odd ratios → bells &amp; metal.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>FM = use one oscillator (the modulator) to wobble another's pitch (the carrier), fast.</li>
+              <li>Fast pitch-wobble is heard as new harmonics — rich timbres from just two sines.</li>
+              <li>Ratio picks the harmonic character (whole = musical, odd = metallic); index picks the brightness.</li>
+              <li>The YM2612 is four of these oscillators (&ldquo;operators&rdquo;) per voice — that's Module 07.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#additive"><span class="dir">← Prev</span><span class="ttl">03 · Additive &amp; harmonics</span></a>
+            <a class="next" href="#envelope"><span class="dir">Next →</span><span class="ttl">05 · Envelopes (ADSR)</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 05 --- -->
+      <section class="doc" id="envelope">
+        <div class="mod-head">
+          <span class="eye">Module 05 <span class="part-tag">· Part I</span></span>
+          <h3>Envelopes — shaping a sound over time</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand how a note's loudness rises, holds and fades (the ADSR envelope), and why that shape defines an instrument's character.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            So far our tones just switch on at a steady volume. Real notes don't. Pluck
+            a string and it snaps loud then rings away; bow it slowly and it swells in
+            and holds. That <em>shape of loudness over time</em> is the note's
+            <strong>envelope</strong>, and it's a huge part of why two instruments
+            playing the same pitch sound completely different.
+          </p>
+          <p>
+            The classic way to describe an envelope has four stages, abbreviated
+            <strong>ADSR</strong>:
+          </p>
+          <div class="defs">
+            <div class="row"><dt>Attack</dt><dd>How long the sound takes to rise from silence up to full volume when the note starts. Short = a sharp hit; long = a gentle fade-in.</dd></div>
+            <div class="row"><dt>Decay</dt><dd>After the peak, how long it takes to fall to the steady level below.</dd></div>
+            <div class="row"><dt>Sustain</dt><dd>The steady level held while the note is still down. Note this is a <em>level</em> (a volume), not a length of time.</dd></div>
+            <div class="row"><dt>Release</dt><dd>After the note is let go, how long it takes to fade from the sustain level back to silence.</dd></div>
+          </div>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Two instruments, one waveform</span>
+            <p>
+              A <strong>drum or pluck</strong> is a near-instant attack, no real
+              sustain, a quick release — a spike that rings away. An
+              <strong>organ or pad</strong> is a slow attack, a high held sustain, a
+              slow release — a smooth swell. Feed <em>both</em> envelopes the same
+              sawtooth and they sound like different instruments. That's the power of
+              the <span class="term" data-tip="The shape of a note's loudness over time — Attack, Decay, Sustain, Release.">envelope</span>.
+            </p>
+          </div>
+
+          <p>
+            This matters enormously on the Genesis because its FM chip gives
+            <em>every one of the four operators its own envelope</em> — so the
+            brightness of an FM sound can change over the life of a note (Module 09).
+            A piano's bright attack that mellows as it rings? That's a modulator's
+            envelope decaying faster than the carrier's. For now, get the basic shape
+            in your ear. Move the four sliders and watch the envelope redraw live, then
+            play a note shaped by it. Try a percussive pluck, then a slow pad.
+          </p>
+
+          <div class="lab" id="lab-env">
+            <div class="lab-head"><span class="dot"></span><span class="title">Envelope lab — shape a note with ADSR</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <canvas class="env-canvas" aria-label="Live drawing of the ADSR envelope shape"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Attack — <span class="val" data-a-val>8 ms</span></label>
+                  <input type="range" min="1" max="600" value="8" data-a aria-label="Attack">
+                </div>
+                <div class="ctrl">
+                  <label>Decay — <span class="val" data-d-val>140 ms</span></label>
+                  <input type="range" min="1" max="800" value="140" data-d aria-label="Decay">
+                </div>
+                <div class="ctrl">
+                  <label>Sustain — <span class="val" data-s-val>55 %</span></label>
+                  <input type="range" min="0" max="100" value="55" data-s aria-label="Sustain">
+                </div>
+                <div class="ctrl">
+                  <label>Release — <span class="val" data-r-val>260 ms</span></label>
+                  <input type="range" min="1" max="1200" value="260" data-r aria-label="Release">
+                </div>
+                <button class="play-btn" data-env-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play note
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>An envelope is a note's loudness shaped over time; ADSR = Attack, Decay, Sustain, Release.</li>
+              <li>Sustain is a level (how loud while held), not a duration.</li>
+              <li>Same waveform + different envelope = a different-sounding instrument.</li>
+              <li>On the YM2612 every operator has its own envelope, so FM timbre <em>evolves</em> as a note plays.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#fm"><span class="dir">← Prev</span><span class="ttl">04 · FM: the big idea</span></a>
+            <a class="next" href="#noise"><span class="dir">Next →</span><span class="ttl">06 · Noise &amp; percussion</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 06 --- -->
+      <section class="doc" id="noise">
+        <div class="mod-head">
+          <span class="eye">Module 06 <span class="part-tag">· Part I</span></span>
+          <h3>Noise &amp; percussion</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn how a pitchless &ldquo;shh&rdquo; plus a filter and a fast envelope becomes a hi-hat or a snare — the last fundamental before we meet the chips.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Not every sound has a pitch. A hi-hat, a snare, an explosion, a rush of
+            wind — these are <strong>noise</strong>: every frequency at once, in
+            random proportion, with no repeating wave to latch a pitch onto. Where an
+            oscillator makes an orderly wave, a noise source makes a chaotic one. On a
+            spectrum it's not a few tidy bars but a solid wall.
+          </p>
+          <p>
+            Raw noise on its own is just static. Percussion comes from two things we
+            already have: a <strong>filter</strong> and an <strong>envelope</strong>.
+            A <span class="term" data-tip="A filter that lets a band of frequencies through and cuts the rest; used to colour noise into a hat, a snare, or a tom.">filter</span>
+            carves the noise into a colour — keep only the very high frequencies and it
+            hisses like a cymbal; keep a mid band and it cracks like a snare. Then a
+            fast <span class="term" data-tip="Attack, Decay, Sustain, Release — here a near-instant attack and a very short decay makes a hit.">envelope</span>
+            (near-instant attack, quick decay, no sustain) turns the steady hiss into a
+            sharp <em>hit</em>.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Sculpting from static</span>
+            <p>
+              Start with a formless block of white noise. The
+              <span class="term" data-tip="Removes unwanted frequencies, leaving a chosen band — turning flat noise into a specific percussion colour.">filter</span>
+              is the chisel that carves it to a shape — bright and thin for a hat,
+              fatter for a snare — and the
+              envelope is how hard and fast you strike it. Same raw material, different
+              tools, different drum.
+            </p>
+          </div>
+
+          <p>
+            This is doubly relevant to the Genesis, because it has <em>two</em> ways to
+            make noise. The PSG (Module 11) has a dedicated <strong>noise
+            channel</strong> — a stream of pseudo-random bits — perfect for cheap hats
+            and zaps. And the FM chip's channel 6 can be switched into an 8-bit
+            <strong>DAC</strong> mode (Module 10) to play back short recorded drum
+            <em>samples</em>. Below, build percussion the classic way: pick a drum,
+            sweep the filter, and hear a hat become a snare become a tom.
+          </p>
+
+          <div class="lab" id="lab-noise">
+            <div class="lab-head"><span class="dot"></span><span class="title">Percussion lab — noise + filter + a fast envelope</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <canvas class="scope" aria-label="Oscilloscope of the percussion hit"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Drum</label>
+                  <div class="seg-btns" role="group" aria-label="Drum type">
+                    <button class="on" data-drum="hat">hi-hat</button>
+                    <button data-drum="snare">snare</button>
+                    <button data-drum="tom">tom</button>
+                  </div>
+                </div>
+                <div class="ctrl">
+                  <label>Filter cutoff — <span class="val" data-noise-cut-val>6000 Hz</span></label>
+                  <input type="range" min="300" max="12000" value="6000" step="50" data-noise-cut aria-label="Filter cutoff">
+                </div>
+                <button class="play-btn" data-noise-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Hit
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Noise is every frequency at once, with no pitch — a solid wall on a spectrum.</li>
+              <li>A filter colours noise (bright = hat, mid = snare) and a fast envelope makes it a hit.</li>
+              <li>The Genesis makes noise two ways: the PSG's noise channel and the FM chip's 8-bit DAC samples.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#envelope"><span class="dir">← Prev</span><span class="ttl">05 · Envelopes (ADSR)</span></a>
+            <a class="next" href="#ym2612"><span class="dir">Next → Part II</span><span class="ttl">07 · Meet the YM2612</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART II ============= -->
+      <section class="part" id="part-2">
+        <div class="part-inner">
+          <div class="kicker">Part II</div>
+          <h3>The Genesis sound chips</h3>
+          <p>
+            Now we put the Part&nbsp;I toolkit into real silicon. The Sega Genesis
+            carries <em>two</em> sound chips: Yamaha's <strong>YM2612</strong> (a.k.a.
+            OPN2), a six-channel four-operator FM synthesiser that makes the console's
+            signature basses, brass and bells; and Texas Instruments' little
+            <strong>SN76489 PSG</strong>, three square waves and a noise channel
+            carried over from the Master System. A <strong>Z80</strong> co-processor
+            runs the driver that pokes both. Six modules, all real hardware — every
+            piece maps back to a fundamental you already know.
+          </p>
+          <div class="part-meta"><span>Modules <b>07–12</b></span><span>Difficulty <b>Hardware</b></span><span>Labs <b>5 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 07 --- -->
+      <section class="doc" id="ym2612">
+        <div class="mod-head">
+          <span class="eye">Module 07 <span class="part-tag">· Part II</span></span>
+          <h3>Meet the YM2612</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the star chip — 6 FM channels, 4 operators each — and hear the kinds of sounds those operators make.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The heart of Genesis sound is the <strong>YM2612</strong>, Yamaha's FM chip
+            (its family name is <span class="term" data-tip="Yamaha's chip family name for the YM2612: FM Operator Type-N, version 2. Same FM engine as their famous synths, on a budget.">OPN2</span>).
+            It runs the exact FM trick from Module 04, but scaled up: it has
+            <strong>6 independent channels</strong> (so six notes at once), and each
+            channel is built from <strong>4 operators</strong> instead of two. An
+            <strong>operator</strong> is just one sine oscillator with its own
+            frequency ratio, output level and envelope — the carrier/modulator of
+            Module 04, generalised.
+          </p>
+          <p>
+            With four operators per voice you can build far richer sounds than a single
+            modulator/carrier pair: you can stack modulators three deep for screaming
+            metallic leads, or run several carriers in parallel for fat, organ-like
+            pads. Exactly <em>how</em> the four operators are wired — who modulates whom
+            — is chosen from eight fixed patterns called <strong>algorithms</strong>,
+            which is the whole of Module 08.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 250" role="img" aria-label="Block diagram of the YM2612: six channels of four operators each, summed to a stereo DAC">
+              <text x="40" y="34" class="d-tag d-blue">YM2612 · OPN2 · ~53.3 kHz</text>
+              <g>
+                <rect x="40" y="52" width="150" height="150" rx="10" class="d-fill-panel2 d-red-s" stroke-width="1.5"/>
+                <text x="115" y="74" text-anchor="middle" class="d-sub">Channel 1</text>
+                <rect x="54" y="86" width="52" height="46" rx="6" class="d-fill-panel d-stroke-line" stroke-width="1.2"/><text x="80" y="114" text-anchor="middle" class="d-sub">OP1</text>
+                <rect x="124" y="86" width="52" height="46" rx="6" class="d-fill-panel d-stroke-line" stroke-width="1.2"/><text x="150" y="114" text-anchor="middle" class="d-sub">OP2</text>
+                <rect x="54" y="142" width="52" height="46" rx="6" class="d-fill-panel d-stroke-line" stroke-width="1.2"/><text x="80" y="170" text-anchor="middle" class="d-sub">OP3</text>
+                <rect x="124" y="142" width="52" height="46" rx="6" class="d-fill-panel d-stroke-line" stroke-width="1.2"/><text x="150" y="170" text-anchor="middle" class="d-sub">OP4</text>
+              </g>
+              <text x="235" y="130" text-anchor="middle" class="d-sub" style="font-size:26px">⋯</text>
+              <g>
+                <rect x="280" y="52" width="150" height="150" rx="10" class="d-fill-panel2 d-red-s" stroke-width="1.5"/>
+                <text x="355" y="74" text-anchor="middle" class="d-sub">Channel 6 / DAC</text>
+                <rect x="294" y="86" width="52" height="46" rx="6" class="d-fill-panel d-stroke-line" stroke-width="1.2"/><text x="320" y="114" text-anchor="middle" class="d-sub">OP1</text>
+                <rect x="364" y="86" width="52" height="46" rx="6" class="d-fill-panel d-stroke-line" stroke-width="1.2"/><text x="390" y="114" text-anchor="middle" class="d-sub">OP2</text>
+                <rect x="294" y="142" width="52" height="46" rx="6" class="d-fill-panel d-stroke-line" stroke-width="1.2"/><text x="320" y="170" text-anchor="middle" class="d-sub">OP3</text>
+                <rect x="364" y="142" width="52" height="46" rx="6" class="d-fill-panel d-gold-s" stroke-width="1.2"/><text x="390" y="170" text-anchor="middle" class="d-sub">DAC</text>
+              </g>
+              <line x1="430" y1="127" x2="520" y2="127" class="d-axis" stroke-width="1.8" marker-end="url(#ymar)"/>
+              <rect x="522" y="96" width="150" height="64" rx="10" class="d-fill-panel2 d-gold-s" stroke-width="1.5"/>
+              <text x="597" y="123" text-anchor="middle" class="d-label" style="font-size:13px">Σ + LFO</text>
+              <text x="597" y="143" text-anchor="middle" class="d-sub">mix &amp; vibrato/tremolo</text>
+              <line x1="672" y1="127" x2="762" y2="127" class="d-axis" stroke-width="1.8" marker-end="url(#ymar)"/>
+              <rect x="764" y="96" width="96" height="64" rx="10" class="d-fill-panel2 d-blue-s" stroke-width="1.5"/>
+              <text x="812" y="123" text-anchor="middle" class="d-label" style="font-size:13px">DAC</text>
+              <text x="812" y="143" text-anchor="middle" class="d-sub">stereo L/R</text>
+              <defs><marker id="ymar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker></defs>
+            </svg>
+            <figcaption class="fig-cap"><strong>The YM2612 at a glance.</strong> Six FM channels, four operators each, summed with a global <span class="term" data-tip="Low-Frequency Oscillator — a slow oscillator that adds vibrato (pitch wobble) and tremolo (volume wobble) to all channels.">LFO</span> and clocked out through a stereo DAC at roughly 53&nbsp;kHz. Channel 6 can drop its FM and become a raw 8-bit sample player (Module 10).</figcaption>
+          </figure>
+
+          <p>
+            A few more facts worth carrying forward. Output is <strong>stereo</strong>,
+            but only as a switch: each channel can be sent to the left, the right, or
+            both — there's no fine panning. The chip is clocked from the main
+            system and produces samples at roughly <strong>53&nbsp;kHz</strong>. And it
+            has a global <span class="term" data-tip="Low-Frequency Oscillator: one slow oscillator shared by all channels, adding vibrato and tremolo.">LFO</span>
+            shared by all channels for vibrato and tremolo. Press the buttons below to
+            hear three four-operator patches the real chip is famous for — a punchy
+            bass, a bright brass stab, and a glassy bell — all synthesised live here by
+            the same FM maths.
+          </p>
+
+          <div class="lab" id="lab-ym">
+            <div class="lab-head"><span class="dot"></span><span class="title">Voice demo — three classic 4-operator patches</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <canvas class="scope" aria-label="Oscilloscope of the FM patch"></canvas>
+              <div class="controls">
+                <button class="play-btn" data-patch="bass">FM bass</button>
+                <button class="play-btn" data-patch="brass">brass stab</button>
+                <button class="play-btn" data-patch="bell">glass bell</button>
+                <span style="font-size:12.5px;color:var(--muted)">Each is 4 operators wired by an algorithm (Module 08), each operator with its own envelope (Module 09).</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The YM2612 (OPN2) is a 6-channel, 4-operator-per-channel FM chip — the Module 04 trick, scaled up.</li>
+              <li>An operator = one sine oscillator with its own ratio, level and envelope.</li>
+              <li>Output is stereo-by-switch (L / R / both), ~53&nbsp;kHz, with a global LFO for vibrato/tremolo.</li>
+              <li>Channel 6 can become a raw 8-bit DAC sample player.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#noise"><span class="dir">← Prev · Part I</span><span class="ttl">06 · Noise &amp; percussion</span></a>
+            <a class="next" href="#algorithms"><span class="dir">Next →</span><span class="ttl">08 · Operators &amp; 8 algorithms</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 08 --- -->
+      <section class="doc" id="algorithms">
+        <div class="mod-head">
+          <span class="eye">Module 08 <span class="part-tag">· Part II</span></span>
+          <h3>Operators &amp; the 8 algorithms</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn how the four operators can be wired together — the eight algorithms — and hear how the same operators become a bass or a bell depending on the routing.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Four operators are only useful if you can connect them. An
+            <strong>algorithm</strong> is a fixed wiring diagram that says which
+            operators are <strong>modulators</strong> (they bend another operator's
+            pitch) and which are <strong>carriers</strong> (their output is actually
+            heard). The YM2612 offers <strong>eight</strong> of them, numbered 0–7, and
+            they run from &ldquo;one long chain&rdquo; to &ldquo;four separate voices
+            added together.&rdquo;
+          </p>
+          <p>
+            The two ends of the range tell the whole story. <strong>Algorithm 0</strong>
+            is a single stack: OP1 modulates OP2 modulates OP3 modulates OP4, and only
+            OP4 is heard — deep, complex, evolving timbres, perfect for basses and
+            leads. <strong>Algorithm 7</strong> is the opposite: all four operators are
+            carriers, simply summed — no FM at all, just four sine waves added, which is
+            additive synthesis (Module 03) and makes soft, organ-like or bell tones.
+            The six algorithms in between mix stacks and parallel branches in every
+            useful combination.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Plumbing the same four taps</span>
+            <p>
+              Picture four taps. You can run them in <em>series</em> so each feeds into
+              the next (one powerful, complex stream), or in <em>parallel</em> so they
+              all pour into the same basin (four gentle streams blending), or any mix.
+              The
+              <span class="term" data-tip="One of 8 fixed wiring patterns telling which operators modulate others (modulators) and which are heard (carriers).">algorithm</span>
+              is the plumbing; the operators are the taps. Same four taps, wildly
+              different results.
+            </p>
+          </div>
+
+          <p>
+            One more ingredient: <strong>OP1</strong> (and only OP1) can feed
+            <em>itself</em> — its own output loops back to modulate its own input. This
+            is <span class="term" data-tip="Operator 1 modulating itself. Low feedback thickens a tone; high feedback drives it toward noise.">feedback</span>,
+            and turning it up gradually pushes a clean tone toward buzz and eventually
+            noise — a cheap way to add grit or even to fake a noise source. Pick an
+            algorithm below: the graph redraws to show the routing (carriers glow gold),
+            and pressing play runs a real four-operator FM voice wired exactly that way,
+            so you can <em>hear</em> the difference the plumbing makes.
+          </p>
+
+          <div class="lab" id="lab-algo">
+            <div class="lab-head"><span class="dot"></span><span class="title">Algorithm picker — see the routing, hear the result</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <div class="algo-grid">
+                <canvas class="algo-graph" data-algo-graph aria-label="Operator routing graph for the selected algorithm"></canvas>
+                <div class="algo-side">
+                  <div class="seg-btns algo-pick" role="group" aria-label="Algorithm">
+                    <button class="on" data-algo="0">0</button>
+                    <button data-algo="1">1</button>
+                    <button data-algo="2">2</button>
+                    <button data-algo="3">3</button>
+                    <button data-algo="4">4</button>
+                    <button data-algo="5">5</button>
+                    <button data-algo="6">6</button>
+                    <button data-algo="7">7</button>
+                  </div>
+                  <p class="algo-desc" data-algo-desc></p>
+                  <div class="ctrl">
+                    <label>OP1 feedback — <span class="val" data-algo-fb-val>0</span></label>
+                    <input type="range" min="0" max="7" value="0" step="1" data-algo-fb aria-label="Feedback">
+                  </div>
+                  <button class="play-btn" data-algo-play>
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Play this algorithm
+                  </button>
+                </div>
+              </div>
+              <span style="font-size:12.5px;color:var(--muted)">Gold nodes are carriers (heard); red arrows are modulation. Algorithm 0 = one deep stack · Algorithm 7 = four sines added.</span>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>An algorithm wires the 4 operators into modulators (bend pitch) and carriers (are heard).</li>
+              <li>The YM2612 has 8 algorithms: from one deep stack (0) to four summed sines (7, pure additive).</li>
+              <li>Only OP1 has feedback — self-modulation that adds grit and can approach noise.</li>
+              <li>Same operators, different algorithm = a completely different instrument.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#ym2612"><span class="dir">← Prev</span><span class="ttl">07 · Meet the YM2612</span></a>
+            <a class="next" href="#envelopes2"><span class="dir">Next →</span><span class="ttl">09 · The YM2612 envelope</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 09 --- -->
+      <section class="doc" id="envelopes2">
+        <div class="mod-head">
+          <span class="eye">Module 09 <span class="part-tag">· Part II</span></span>
+          <h3>The YM2612 envelope — AR/D1R/D2R/RR, SL &amp; TL</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the real chip's per-operator envelope and level controls, and hear how they make an FM tone evolve — bright attack, mellow tail.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Module 05's ADSR was the friendly version. The YM2612 uses a close cousin
+            with Yamaha's own names, and — crucially — <em>every operator has its
+            own</em>. Because a modulator's envelope controls how much it modulates over
+            time, an operator's envelope doesn't just change volume; on a modulator it
+            changes the whole <em>brightness</em> of the sound as the note evolves. A
+            hard, bright attack that settles into a mellow tone is simply a modulator
+            whose envelope decays faster than the carrier's.
+          </p>
+          <p>
+            The chip splits ADSR's &ldquo;decay&rdquo; into two rates and adds a level
+            control, giving five envelope parameters plus one master level per operator:
+          </p>
+          <div class="defs">
+            <div class="row"><dt>AR — Attack Rate</dt><dd>How fast the operator rises to full level. High AR = an instant hit.</dd></div>
+            <div class="row"><dt>D1R — First Decay</dt><dd>The fall from the peak down to the &ldquo;sustain&rdquo; knee.</dd></div>
+            <div class="row"><dt>SL — Sustain Level</dt><dd>Where that first decay stops — the knee the tone settles onto.</dd></div>
+            <div class="row"><dt>D2R — Second Decay</dt><dd>A slower fall <em>continuing</em> while the key is held (0 = hold the sustain forever).</dd></div>
+            <div class="row"><dt>RR — Release Rate</dt><dd>How fast the tone fades once the key is let go.</dd></div>
+            <div class="row"><dt>TL — Total Level</dt><dd>The operator's overall output — its master volume (as a carrier) or modulation depth (as a modulator). This is the single most powerful timbre knob on the chip.</dd></div>
+          </div>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Four dimmer switches with timers</span>
+            <p>
+              Think of each operator as a lamp on its own timer-dimmer: how fast it
+              brightens (AR), how it dims to a resting glow (D1R to SL), whether it keeps
+              fading while held (D2R), and how it goes out when released (RR). The
+              <span class="term" data-tip="Total Level — an operator's overall output. On a carrier it sets volume; on a modulator it sets how much brightness it adds.">TL</span>
+              is the master brightness of each lamp. Four lamps, each on its own
+              programme, blended by the algorithm — that's an FM patch.
+            </p>
+          </div>
+
+          <p>
+            The lab gives you a four-operator voice (algorithm 2 — two modulators into a
+            carrier). The <strong>TL board</strong> sets each operator's level; drop a
+            <em>modulator's</em> TL and the tone gets purer, raise it and it gets
+            buzzier. The shared envelope sliders (AR/D1R/D2R/RR + SL) shape how the whole
+            patch moves. Try a fast attack with a quick D1R on the modulators for a
+            piano-like &ldquo;bright then mellow,&rdquo; then a slow attack for a pad
+            that blooms.
+          </p>
+
+          <div class="lab" id="lab-env2">
+            <div class="lab-head"><span class="dot"></span><span class="title">4-operator envelope &amp; TL board</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <canvas class="env-canvas" aria-label="Envelope shape of the carrier"></canvas>
+              <div class="tl-board" data-tl-board aria-label="Operator total-level board"></div>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>AR — <span class="val" data-e2-ar-val>90 %</span></label>
+                  <input type="range" min="1" max="100" value="90" data-e2-ar aria-label="Attack rate">
+                </div>
+                <div class="ctrl">
+                  <label>D1R — <span class="val" data-e2-d1-val>40 %</span></label>
+                  <input type="range" min="1" max="100" value="40" data-e2-d1 aria-label="First decay rate">
+                </div>
+                <div class="ctrl">
+                  <label>SL — <span class="val" data-e2-sl-val>60 %</span></label>
+                  <input type="range" min="0" max="100" value="60" data-e2-sl aria-label="Sustain level">
+                </div>
+                <div class="ctrl">
+                  <label>D2R — <span class="val" data-e2-d2-val>12 %</span></label>
+                  <input type="range" min="0" max="100" value="12" data-e2-d2 aria-label="Second decay rate">
+                </div>
+                <div class="ctrl">
+                  <label>RR — <span class="val" data-e2-rr-val>50 %</span></label>
+                  <input type="range" min="1" max="100" value="50" data-e2-rr aria-label="Release rate">
+                </div>
+                <button class="play-btn" data-env2-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play patch
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The YM2612 envelope is AR, D1R, SL, D2R, RR — ADSR with the decay split in two.</li>
+              <li>Every operator has its own envelope, so a modulator can fade and change the timbre over time.</li>
+              <li>TL (Total Level) is the master knob: carrier volume, or modulator depth = brightness.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#algorithms"><span class="dir">← Prev</span><span class="ttl">08 · Operators &amp; 8 algorithms</span></a>
+            <a class="next" href="#lfo-dac"><span class="dir">Next →</span><span class="ttl">10 · LFO, feedback &amp; DAC</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 10 --- -->
+      <section class="doc" id="lfo-dac">
+        <div class="mod-head">
+          <span class="eye">Module 10 <span class="part-tag">· Part II</span></span>
+          <h3>LFO, feedback &amp; the DAC channel</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the three finishing touches: the global LFO (vibrato &amp; tremolo), feedback, and channel 6's 8-bit PCM DAC — how the Genesis got drums and speech.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Three features turn the raw FM engine into a full instrument. The first is
+            the <strong>LFO</strong> — a <em>Low-Frequency Oscillator</em>, a single
+            slow sine (a few Hz) shared by all six channels. It's too slow to hear as a
+            pitch; instead it gently wobbles other things. Routed to pitch it's
+            <span class="term" data-tip="A slow pitch wobble — the LFO nudging the note's frequency up and down a few times a second.">vibrato</span>
+            (PM, phase modulation); routed to volume it's
+            <span class="term" data-tip="A slow volume wobble — the LFO nudging loudness up and down a few times a second.">tremolo</span>
+            (AM, amplitude modulation). Each channel chooses how much of each it wants.
+          </p>
+          <p>
+            The second is <strong>feedback</strong> from Module 08 — OP1 modulating
+            itself — which we'll revisit in the lab as a grit control. The third is the
+            most surprising: the <strong>DAC channel</strong>. At the flip of a register
+            bit, <strong>channel 6</strong> abandons FM entirely and becomes a plain
+            8-bit <span class="term" data-tip="Digital-to-Analogue Converter — hardware that turns a stream of raw sample numbers straight into sound, with no synthesis.">DAC</span>:
+            the driver writes raw sample bytes to it as fast as it can, and it plays them
+            back directly. That's how the Genesis produced drums, sampled hits and the
+            famous grainy speech (&ldquo;SEGA!&rdquo;) — at the cost of losing an FM
+            channel and pinning the Z80 or 68000 busy feeding it.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A synth with a cassette slot</span>
+            <p>
+              Five of the six channels are a proper synthesiser, making tones from
+              scratch. Channel 6 has a hidden cassette slot: flip it and instead of
+              synthesising, it just plays back whatever recorded bytes you shove in.
+              Cheap, grainy, and effective — the only way an FM chip gets a real
+              <em>recorded</em> drum.
+            </p>
+          </div>
+
+          <p>
+            The lab has two halves. The <strong>LFO</strong> half takes a sustained FM
+            brass tone and lets you dial vibrato (PM) and tremolo (AM) depth and speed —
+            hear the tone come alive. The <strong>DAC</strong> half synthesises a short
+            8-bit drum sample in your browser (decaying noise + a sine thump, quantised
+            to 8 bits like the real thing) and plays it through a simulated DAC channel.
+          </p>
+
+          <div class="lab" id="lab-lfo">
+            <div class="lab-head"><span class="dot"></span><span class="title">LFO &amp; DAC lab</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <canvas class="scope" aria-label="Oscilloscope of the LFO-modulated tone or DAC drum"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>LFO rate — <span class="val" data-lfo-rate-val>5.0 Hz</span></label>
+                  <input type="range" min="0.5" max="12" value="5" step="0.1" data-lfo-rate aria-label="LFO rate">
+                </div>
+                <div class="ctrl">
+                  <label>Vibrato (PM) — <span class="val" data-lfo-pm-val>25 %</span></label>
+                  <input type="range" min="0" max="100" value="25" data-lfo-pm aria-label="Vibrato depth">
+                </div>
+                <div class="ctrl">
+                  <label>Tremolo (AM) — <span class="val" data-lfo-am-val>20 %</span></label>
+                  <input type="range" min="0" max="100" value="20" data-lfo-am aria-label="Tremolo depth">
+                </div>
+                <button class="play-btn" data-lfo-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play FM tone
+                </button>
+                <button class="play-btn" data-dac-play style="background:linear-gradient(180deg,var(--gold),#d99a20);color:#241a05">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Hit DAC drum
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The LFO is one slow shared oscillator adding vibrato (PM, pitch) and tremolo (AM, volume).</li>
+              <li>Feedback (OP1 self-modulation) is a grit knob — clean tone up to noise.</li>
+              <li>Channel 6 can become a raw 8-bit DAC that plays sample bytes directly — the Genesis' drums &amp; speech.</li>
+              <li>The DAC costs an FM channel and keeps a CPU busy streaming bytes to it.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#envelopes2"><span class="dir">← Prev</span><span class="ttl">09 · The YM2612 envelope</span></a>
+            <a class="next" href="#psg"><span class="dir">Next →</span><span class="ttl">11 · The SN76489 PSG</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 11 --- -->
+      <section class="doc" id="psg">
+        <div class="mod-head">
+          <span class="eye">Module 11 <span class="part-tag">· Part II</span></span>
+          <h3>The SN76489 PSG — 3 squares + noise</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the Genesis' second, humbler sound chip — three square waves and a noise channel — and hear the 8-bit voice it adds under the FM.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Alongside the mighty FM chip sits a tiny veteran: the
+            <strong>SN76489</strong>, a Texas Instruments <strong>PSG</strong>
+            (Programmable Sound Generator) carried straight over from the Sega Master
+            System. It's almost comically simple next to the YM2612 — but Genesis
+            composers used it constantly for chiptune melodies, arpeggios, sparkle and
+            hi-hats sitting on top of the FM.
+          </p>
+          <p>
+            It has exactly <strong>four</strong> channels: three
+            <strong>square-wave tone channels</strong> and one <strong>noise
+            channel</strong>. Each tone channel has a 10-bit frequency and a
+            <strong>4-bit attenuation</strong> — a volume control with just 16 steps,
+            where each step drops the level by 2&nbsp;dB and step 15 is silence. That's
+            the whole per-channel state: a pitch and one of 16 volumes. The noise
+            channel is a
+            <span class="term" data-tip="Linear-Feedback Shift Register — a chain of bits that shifts and XORs to produce a long pseudo-random sequence. Cheap hardware noise.">LFSR</span>
+            (linear-feedback shift register) that can run in a &ldquo;white&rdquo; hiss
+            or a &ldquo;periodic&rdquo; buzzy mode, and can borrow tone channel 3's pitch
+            to tune its noise.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A four-piece busker band</span>
+            <p>
+              If the YM2612 is a full studio, the PSG is a busker with three kazoos and
+              a shaker. Not much range — each kazoo does one buzzy note at one of
+              sixteen volumes — but together, quick and rhythmic, they carry a
+              surprisingly catchy tune. Every &ldquo;bleep-bloop&rdquo; you associate
+              with 8-bit Sega is these three squares.
+            </p>
+          </div>
+
+          <p>
+            Build a little PSG arrangement below: three square channels (set each one's
+            note and 4-bit volume) plus the noise channel for a hat. Press play and it
+            arpeggiates the three tones with the noise ticking underneath — a whole
+            chiptune backing from four of the simplest voices imaginable.
+          </p>
+
+          <div class="lab" id="lab-psg">
+            <div class="lab-head"><span class="dot"></span><span class="title">PSG lab — 3 squares + noise, 4-bit volumes</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <div class="psg-board" data-psg-board aria-label="PSG channel controls"></div>
+              <div class="controls">
+                <button class="play-btn" data-psg-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play arrangement
+                </button>
+                <span style="font-size:12.5px;color:var(--muted)">Each tone channel: a note + a 4-bit attenuation (16 steps, 2&nbsp;dB each). Channel 4 is the noise hat.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The SN76489 PSG is 3 square-tone channels + 1 noise channel, inherited from the Master System.</li>
+              <li>Each channel's volume is a 4-bit attenuation: 16 steps of 2&nbsp;dB, step 15 = off.</li>
+              <li>The noise channel is an LFSR (white or periodic) and can track tone channel 3's pitch.</li>
+              <li>Composers layered PSG melodies, sparkle and hats over the FM.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#lfo-dac"><span class="dir">← Prev</span><span class="ttl">10 · LFO, feedback &amp; DAC</span></a>
+            <a class="next" href="#z80"><span class="dir">Next →</span><span class="ttl">12 · The Z80 sound driver</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 12 --- -->
+      <section class="doc" id="z80">
+        <div class="mod-head">
+          <span class="eye">Module 12 <span class="part-tag">· Part II</span></span>
+          <h3>The Z80 as sound driver</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand who actually pokes the sound chips every frame — the Z80 co-processor — and the bus handshake it shares with the 68000.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The sound chips are just registers; something has to write notes into them,
+            in time, sixty times a second. On the Genesis that something is a whole
+            second CPU: a <strong>Zilog Z80</strong> running at about
+            <strong>3.58&nbsp;MHz</strong> with its own <strong>8&nbsp;KB of RAM</strong>.
+            It's the same chip that <em>was</em> the Master System's main processor —
+            which is also how the Genesis stays backwards-compatible with Master System
+            games.
+          </p>
+          <p>
+            In a Genesis game the Z80's usual job is to run the <strong>sound
+            driver</strong>: a small program (SMPS/GEMS were the popular ones) that
+            reads the music data, converts notes into YM2612 and PSG register writes,
+            ticks envelopes and, when needed, spoon-feeds bytes to the DAC channel. The
+            main 68000 just sends it high-level cues — &ldquo;play track 3,&rdquo;
+            &ldquo;stop&rdquo; — and gets on with the game. It's the same
+            division-of-labour idea consoles use everywhere: a dedicated processor for
+            sound so the main CPU isn't stuck counting envelope timers.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A conductor and an orchestra</span>
+            <p>
+              The 68000 is a busy director who just shouts &ldquo;play the boss theme!&rdquo;
+              The Z80 is the conductor who actually knows the score and cues every
+              instrument — the YM2612's six FM voices and the PSG's four — beat by beat.
+              The director never reads the sheet music; that's the conductor's job.
+            </p>
+          </div>
+
+          <p>
+            There's a catch that shapes Genesis audio programming. The Z80 and the
+            68000 partly share the bus to the sound hardware, so they can't both touch
+            it at once. When the 68000 needs to reach across — to load new music, say —
+            it asserts a <span class="term" data-tip="Bus Request: the 68000 asks the Z80 to pause and release the shared bus so the 68000 can access sound hardware safely.">Z80 bus request</span>,
+            waits for the Z80 to let go, does its business, then releases it. Get the
+            timing wrong and you get stuck notes or crashes — a classic Genesis
+            homebrew bug. Watch the handshake play out below.
+          </p>
+
+          <figure class="figure" id="z80-flow">
+            <svg viewBox="0 0 900 210" role="img" aria-label="The 68000 requesting the bus from the Z80 to reach the sound chips">
+              <rect x="40" y="80" width="150" height="64" rx="10" class="d-fill-panel2 d-blue-s" stroke-width="1.5"/>
+              <text x="115" y="107" text-anchor="middle" class="d-label" style="font-size:14px">68000</text>
+              <text x="115" y="127" text-anchor="middle" class="d-sub">main CPU</text>
+              <rect x="375" y="80" width="150" height="64" rx="10" class="d-fill-panel2 d-red-s" stroke-width="1.5"/>
+              <text x="450" y="107" text-anchor="middle" class="d-label" style="font-size:14px">Z80</text>
+              <text x="450" y="127" text-anchor="middle" class="d-sub">sound driver · 8&nbsp;KB</text>
+              <rect id="g-z80chips" x="710" y="80" width="150" height="64" rx="10" class="d-fill-panel2 d-gold-s" stroke-width="1.5"/>
+              <text x="785" y="107" text-anchor="middle" class="d-label" style="font-size:13px">YM2612 + PSG</text>
+              <text x="785" y="127" text-anchor="middle" class="d-sub">sound chips</text>
+              <path id="p-z80-play" d="M525 112 C 590 112, 640 112, 708 112" fill="none" stroke="#343a4d" stroke-width="1.6" marker-end="url(#z80h)"/>
+              <path id="p-req" d="M190 96 C 260 84, 310 84, 373 96" fill="none" stroke="#343a4d" stroke-width="1.6" marker-end="url(#z80h)"/>
+              <path id="p-grant" d="M373 128 C 310 140, 260 140, 192 128" fill="none" stroke="#343a4d" stroke-width="1.6" marker-end="url(#z80h)"/>
+              <path id="p-68-chips" d="M190 150 C 400 196, 560 196, 780 150" fill="none" stroke="#343a4d" stroke-width="1.6" marker-end="url(#z80h)"/>
+              <text x="282" y="74" text-anchor="middle" class="d-flow">BUSREQ</text>
+              <text x="282" y="158" text-anchor="middle" class="d-flow">BUSACK (Z80 pauses)</text>
+              <text x="600" y="98" text-anchor="middle" class="d-flow">every frame: notes → chips</text>
+              <defs><marker id="z80h" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#343a4d"/></marker></defs>
+            </svg>
+            <div class="flow-controls">
+              <button class="surr-btn" data-z80-flow>▶ Animate the bus handshake</button>
+              <span class="fig-cap anim-cap" data-anim-cap>Watch the Z80 drive the chips every frame — and the 68000 politely borrow the bus when it must.</span>
+            </div>
+            <figcaption class="fig-cap"><strong>Who owns the bus.</strong> Normally the Z80 streams notes into the YM2612 and PSG each frame. To reach the sound hardware itself, the 68000 raises <span class="term" data-tip="Bus Request — the 68000's signal asking the Z80 to release the shared bus.">BUSREQ</span>, waits for the Z80 to acknowledge and pause, then accesses the chips before handing the bus back.</figcaption>
+          </figure>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A Zilog Z80 @ ~3.58&nbsp;MHz with 8&nbsp;KB RAM runs the sound driver (SMPS, GEMS…).</li>
+              <li>It converts music data into YM2612/PSG register writes and can feed the DAC — the same Z80 that was the Master System's CPU.</li>
+              <li>The 68000 sends high-level cues; the Z80 does the per-frame poking.</li>
+              <li>They share the sound bus, so the 68000 must bus-request the Z80 to pause before reaching across.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#psg"><span class="dir">← Prev</span><span class="ttl">11 · The SN76489 PSG</span></a>
+            <a class="next" href="#nuked"><span class="dir">Next → Part III</span><span class="ttl">13 · Nuked-OPN2</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART III ============ -->
+      <section class="part" id="part-3">
+        <div class="part-inner">
+          <div class="kicker">Part III</div>
+          <h3>Emulating the chips</h3>
+          <p>
+            Finally: how does software on your PC stand in for that FM chip and its
+            square-wave sidekick? We look at <strong>Nuked-OPN2</strong> — the
+            sample-accurate YM2612 emulation now used by serious emulators — the
+            notorious hardware quirks that make the YM2612 so hard to get right, and how
+            <strong>Genesis Plus GX</strong> and <strong>BlastEm</strong> mix it all
+            back together. Four modules that connect the whole course to the settings
+            you'll actually toggle.
+          </p>
+          <div class="part-meta"><span>Modules <b>13–16</b></span><span>Difficulty <b>Emulation</b></span><span>Labs <b>2 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 13 --- -->
+      <section class="doc" id="nuked">
+        <div class="mod-head">
+          <span class="eye">Module 13 <span class="part-tag">· Part III</span></span>
+          <h3>Nuked-OPN2 — sample-accurate FM</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand the two philosophies of FM emulation, and why a die-level model like Nuked-OPN2 became the accuracy reference.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            To emulate the YM2612 you face a fork in the road. You can reimplement FM
+            <em>from the datasheet</em> — build operators, envelopes and algorithms in
+            clean C and run them at the output rate. This is fast and sounds broadly
+            right; it's how many older emulators (and the long-serving
+            <span class="term" data-tip="A widely used, efficient YM2612 emulation core by Jarek Burczynski, accurate enough for most games but not bit-exact.">MAME &ldquo;ym2612&rdquo;</span>
+            core) worked. Or you can go the other way and model the <em>actual
+            chip</em>, gate by gate.
+          </p>
+          <p>
+            That second path is <strong>Nuked-OPN2</strong>, by Alexey Khokholov
+            (nukeykt). It was built by decapping a real YM3438 (the CMOS sibling of the
+            YM2612), tracing the silicon, and reproducing the chip's internal 24-stage
+            operator pipeline cycle by cycle. The result is
+            <strong>sample-accurate</strong>: it doesn't just approximate the sound, it
+            reproduces the chip's exact internal timing, its rounding, and — critically
+            — its <em>bugs</em>. Genesis Plus GX and BlastEm both offer Nuked-OPN2 as
+            their high-accuracy YM2612 core.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A cover band vs. a master tape</span>
+            <p>
+              A datasheet reimplementation is a tight cover band: they play the song
+              from the sheet music, and it sounds great. Nuked-OPN2 is the original
+              master tape — every breath, every bit of tape hiss, every accidental
+              buzz the engineers left in. When the goal is &ldquo;identical to real
+              hardware,&rdquo; only the master tape will do.
+            </p>
+          </div>
+
+          <p>
+            Why go to such lengths? Because the YM2612 is <em>full</em> of behaviour
+            that isn't in any datasheet — quirks that games unknowingly relied on, so
+            that a &ldquo;correct&rdquo; textbook implementation actually sounds
+            <em>wrong</em>. The most infamous is the DAC &ldquo;ladder effect,&rdquo; a
+            distortion baked into the analogue output stage that a clean digital model
+            simply doesn't have. Reproducing quirks like that is the entire subject of
+            the next module — and the reason die-level emulation exists.
+          </p>
+
+          <div class="note hw">
+            <div class="ico">▍</div>
+            <div><p><strong>The trade-off.</strong> Die-level accuracy isn't free: Nuked-OPN2
+            runs the chip's internal clock, so it costs noticeably more CPU than a
+            datasheet core. Emulators expose it as a choice — Genesis Plus GX and
+            BlastEm let you pick the fast core for weak hardware or the accurate
+            Nuked core when you want the real thing. Same dial the GameCube's DSP
+            emulation offered as LLE-vs-HLE, here for the FM chip.</p></div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>FM can be emulated from the datasheet (fast, approximate) or from the silicon (slow, exact).</li>
+              <li>Nuked-OPN2 models the real chip's 24-stage pipeline cycle-accurately, reproducing its timing and bugs.</li>
+              <li>Genesis Plus GX and BlastEm both offer Nuked-OPN2 as the high-accuracy YM2612 core.</li>
+              <li>Accuracy matters because games rely on undocumented quirks — the subject of Module 14.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#z80"><span class="dir">← Prev · Part II</span><span class="ttl">12 · The Z80 sound driver</span></a>
+            <a class="next" href="#quirks"><span class="dir">Next →</span><span class="ttl">14 · The hard parts</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 14 --- -->
+      <section class="doc" id="quirks">
+        <div class="mod-head">
+          <span class="eye">Module 14 <span class="part-tag">· Part III</span></span>
+          <h3>The hard parts — the notorious YM2612 quirks</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the undocumented behaviours that make the YM2612 hard to emulate — and hear the most famous one, the DAC &ldquo;ladder effect.&rdquo;</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A textbook FM chip would be easy to emulate. The real YM2612 is a minefield
+            of quirks, and getting them right is the difference between &ldquo;sounds
+            like a Genesis&rdquo; and &ldquo;sounds like a cheap FM app.&rdquo; Here are
+            the big ones.
+          </p>
+          <h4>The DAC &ldquo;ladder effect&rdquo;</h4>
+          <p>
+            The most famous quirk. The YM2612's output DAC is slightly non-linear right
+            around zero: because of how its digital-to-analogue conversion is built,
+            there's a small <em>gap</em> straddling the zero crossing — positive and
+            negative values are nudged apart. On quiet or bass-heavy sounds this
+            <span class="term" data-tip="A crossover distortion in the YM2612's DAC: a small discontinuity at the zero crossing that adds a characteristic buzz, absent from the later YM3438.">ladder effect</span>
+            adds a characteristic gritty buzz — and famously, it's <em>louder</em> on
+            quieter notes. Composers wrote basslines that leaned into it. A clean
+            digital model omits it and sounds sterile; the later surface-mount YM3438
+            actually fixed it, which is why some Genesis models sound subtly different.
+          </p>
+          <p>
+            You can hear it in the lab below: the same soft FM bass, rendered
+            <strong>clean</strong> versus with the <strong>ladder</strong> crossover
+            distortion modelled. Listen for the extra edge and buzz on the ladder
+            version — that grit is the sound of a hardware bug, faithfully reproduced.
+          </p>
+
+          <div class="lab" id="lab-ladder">
+            <div class="lab-head"><span class="dot"></span><span class="title">The ladder effect — clean vs. real DAC</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <canvas class="scope" aria-label="Oscilloscope of the bass, clean or with ladder distortion"></canvas>
+              <div class="controls">
+                <button class="play-btn" data-ladder="clean">clean model</button>
+                <button class="play-btn" data-ladder="ladder" style="background:linear-gradient(180deg,var(--gold),#d99a20);color:#241a05">ladder effect (real)</button>
+                <span style="font-size:12.5px;color:var(--muted)">Same notes, same envelope — only the DAC's zero-crossing distortion differs.</span>
+              </div>
+            </div>
+          </div>
+
+          <h4>The other traps</h4>
+          <div class="defs">
+            <div class="row"><dt>The busy flag</dt><dd>After a register write the chip raises a &ldquo;busy&rdquo; status bit for a fixed time. Its timing is quirky and some drivers poll it; emulators must reproduce the exact busy duration or timing-sensitive code misbehaves.</dd></div>
+            <div class="row"><dt>Channel-3 special mode</dt><dd>Channel 3 can be switched to give its <em>four operators independent frequencies</em> instead of one — used for sound effects and clever chords. It's a separate code path most of the chip doesn't have.</dd></div>
+            <div class="row"><dt>DAC + channel 6</dt><dd>Enabling the DAC steals channel 6's FM, and the exact moment the switch takes effect (and how the DAC and FM outputs blend during it) is subtle — a common source of clicks and pops in naive emulators.</dd></div>
+            <div class="row"><dt>Undocumented timing</dt><dd>The real chip updates operators on a rotating internal schedule (that 24-stage pipeline). Envelope rates, LFO phase and key-on timing all depend on it — which is exactly why Nuked-OPN2 models the pipeline rather than the datasheet.</dd></div>
+          </div>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A haunted house's creaky stair</span>
+            <p>
+              You can rebuild a house to the blueprints perfectly and it still won't
+              feel like the original — because the original had a creaky seventh stair,
+              a draught, a door that sticks. The YM2612's quirks are those creaks:
+              nobody designed them in, everybody got used to them, and a faithful
+              rebuild has to creak in all the same places.
+            </p>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The DAC ladder effect is a zero-crossing distortion — grittier on quiet notes — that games leaned on; the YM3438 fixed it.</li>
+              <li>The busy flag's exact timing matters to some drivers.</li>
+              <li>Channel-3 special mode gives its four operators independent pitches.</li>
+              <li>Undocumented pipeline timing is why sample-accurate cores (Nuked-OPN2) model the silicon, not the datasheet.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#nuked"><span class="dir">← Prev</span><span class="ttl">13 · Nuked-OPN2</span></a>
+            <a class="next" href="#psg-mix"><span class="dir">Next →</span><span class="ttl">15 · PSG emulation &amp; mixing</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 15 --- -->
+      <section class="doc" id="psg-mix">
+        <div class="mod-head">
+          <span class="eye">Module 15 <span class="part-tag">· Part III</span></span>
+          <h3>PSG emulation &amp; mixing</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how the humble PSG is emulated, and how the two chips' outputs are combined and resampled to your sound card.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The SN76489 is far easier to emulate than the FM chip, but it has its own
+            little authenticity details. Its square waves come from simple counters, so
+            those are trivial — the interesting parts are the <strong>volume table</strong>
+            and the <strong>noise generator</strong>. The 4-bit attenuation isn't
+            linear: each of the 16 steps is 2&nbsp;dB, so an accurate emulator uses a
+            lookup table of the real output voltages rather than a naive
+            &ldquo;volume ÷ 15.&rdquo; Get that table wrong and PSG balance sounds off.
+          </p>
+          <p>
+            The noise channel is an
+            <span class="term" data-tip="Linear-Feedback Shift Register — bits shift along a register and feed back via XOR, producing a long pseudo-random pattern that repeats.">LFSR</span>
+            with a specific bit width and feedback tap, and different SN76489 variants
+            used slightly different taps — so Genesis Plus GX carries the Sega-flavoured
+            LFSR to make the noise's exact timbre match real hardware. There's also a
+            subtle detail where writing the volume produces a tiny DC step; some cores
+            model it because a few tunes rely on it for click-drum effects.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Two singers sharing one microphone</span>
+            <p>
+              The FM chip and the PSG are two performers with very different voices, and
+              at the end they both have to go down one wire to your speakers. The mixer
+              is the single microphone: it has to balance the loud FM against the thin
+              PSG, resample both to a common rate, and hand over one clean stereo
+              stream — without either one drowning the other.
+            </p>
+          </div>
+
+          <p>
+            That balancing act is the mixer's job, and it's where emulators finish the
+            audio path. The YM2612 produces samples at about <strong>53&nbsp;kHz</strong>
+            and the PSG at a different clock; both get summed and
+            <span class="term" data-tip="Changing a stream's sample rate by interpolating new sample values — the same resampling idea, applied at the output.">resampled</span>
+            to whatever your sound card wants (usually 44.1 or 48&nbsp;kHz). Emulators
+            differ in how carefully: BlastEm is known for a low-pass reconstruction
+            filter and band-limited output that mimics the console's own analogue tone,
+            while the relative FM-to-PSG mixing level is a small but real balance choice
+            each core makes. Get the resampling lazy and you re-introduce the aliasing
+            from Part I; do it well and it sounds like the machine.
+          </p>
+
+          <div class="pipe">
+            <div class="stage"><div class="t">YM2612</div><div class="d">6 FM ch + DAC · ~53&nbsp;kHz</div></div>
+            <div class="arrow">+</div>
+            <div class="stage"><div class="t">SN76489</div><div class="d">3 squares + noise · volume table</div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">Mix &amp; filter</div><div class="d">balance, low-pass, resample</div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">Sound card</div><div class="d">44.1 / 48&nbsp;kHz stereo</div></div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>PSG emulation hinges on an accurate 2&nbsp;dB-per-step volume table and the right LFSR noise taps.</li>
+              <li>Genesis Plus GX uses the Sega-flavoured LFSR so noise timbre matches hardware.</li>
+              <li>The FM and PSG outputs are summed, balanced, low-pass filtered and resampled to your sound card.</li>
+              <li>Careful resampling (e.g. BlastEm's band-limited output) avoids re-introducing Part I aliasing.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#quirks"><span class="dir">← Prev</span><span class="ttl">14 · The hard parts</span></a>
+            <a class="next" href="#try"><span class="dir">Next →</span><span class="ttl">16 · Try it in an emulator</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 16 --- -->
+      <section class="doc" id="try">
+        <div class="mod-head">
+          <span class="eye">Module 16 <span class="part-tag">· Part III</span></span>
+          <h3>Try it in an emulator</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Turn the whole course into a few settings you can toggle and A/B in Genesis Plus GX or BlastEm.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            You now have the full picture, so let's make it hands-on. Grab
+            <strong>Genesis Plus GX</strong> (standalone or as a RetroArch core) or
+            <strong>BlastEm</strong>, load a game, and dig into the audio options —
+            every one maps to something you can now explain:
+          </p>
+          <ul>
+            <li><strong>YM2612 core: Nuked-OPN2 vs. MAME/fast</strong> — the Module 13 choice. Nuked is bit-exact (and gives you the ladder effect); the fast core saves CPU. On weak hardware, pick fast.</li>
+            <li><strong>&ldquo;Ladder effect&rdquo; / DAC distortion</strong> — Module 14. Some cores let you toggle it; on for authentic YM2612 grit, off for the cleaner YM3438 sound.</li>
+            <li><strong>Low-pass / audio filter</strong> — Module 15. BlastEm's reconstruction filter softens the highs the way the real console's analogue output did.</li>
+            <li><strong>PSG volume / FM-PSG balance</strong> — Module 11 &amp; 15. If the squares sound too loud or too buried, this is the knob.</li>
+          </ul>
+
+          <div class="note hw">
+            <div class="ico">▍</div>
+            <div><p><strong>A great A/B test.</strong> Load a bass-heavy tune, then toggle
+            the ladder effect on and off (or switch between the Nuked and fast YM2612
+            cores). The extra buzz that appears is Module 14's DAC quirk — a hardware
+            bug so beloved that emulators went to die-level lengths to keep it. That one
+            toggle is the whole of Part III, audible.</p></div>
+          </div>
+
+          <h4>Final exam — six broken soundtracks</h4>
+          <p>
+            Six situations, straight out of how the chips really behave. You're the one
+            at the keyboard: pick the answer that fits. Every one points back at the
+            module that taught it.
+          </p>
+
+          <div class="lab" id="lab-quiz">
+            <div class="lab-head"><span class="dot"></span><span class="title">Diagnose it — what's going on?</span><span class="badge">quiz · <span data-quiz-score>0 / 6</span></span></div>
+            <div class="lab-body">
+              <div class="quiz" data-quiz></div>
+              <div class="q-verdict" data-quiz-verdict hidden></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Course complete ✦</div>
+            <ul>
+              <li>You can read the signal path from a pressure wave to the YM2612 to your speakers.</li>
+              <li>You understand FM synthesis — operators, algorithms, envelopes, feedback and the LFO.</li>
+              <li>You know the PSG, the Z80 driver, and how emulators like Genesis Plus GX &amp; BlastEm reproduce it all.</li>
+              <li>You can explain every audio setting in a Genesis emulator — and predict what each will do.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#psg-mix"><span class="dir">← Prev</span><span class="ttl">15 · PSG emulation &amp; mixing</span></a>
+            <a class="next" href="#waves"><span class="dir">↺ Restart</span><span class="ttl">01 · What sound is</span></a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <p>
+          An interactive course about the Sega Genesis / Mega Drive sound hardware.
+          Every sound here is generated on the fly with the Web&nbsp;Audio API to
+          illustrate a concept — the FM maths, the PSG's squares, the DAC's grit — so
+          you can hear the ideas, not the games. This page contains
+          <strong>no game audio</strong>. Technical details are grounded in the
+          open-source emulators <a href="https://github.com/ekeeke/Genesis-Plus-GX">Genesis Plus GX</a>,
+          <a href="https://github.com/libretro/blastem">BlastEm</a> and
+          <a href="https://github.com/nukeykt/Nuked-OPN2">Nuked-OPN2</a>.
+        </p>
+        <p class="src">
+          Sega, Genesis and Mega Drive are trademarks of Sega. This is an independent,
+          non-commercial educational project, not affiliated with or endorsed by Sega.
+        </p>
+      </footer>
+
+    </div><!-- /wrap -->
+  </main>
+</div><!-- /app -->
+
+<!-- ================================================= PLAYER ============== -->
+<div class="player" role="region" aria-label="Sound player">
+  <div class="transport">
+    <button class="pp" id="pp" aria-label="Play">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <div class="meta">
+      <div class="now">Now playing</div>
+      <div class="track" id="now-track">Nothing playing</div>
+    </div>
+  </div>
+  <canvas class="viz" id="player-viz" aria-hidden="true"></canvas>
+  <div class="right">
+    <div class="stat" id="stat-voices">Web&nbsp;Audio · <b>synth</b><br>no game audio</div>
+    <input type="range" class="vol" id="vol" min="0" max="100" value="70" aria-label="Master volume">
+  </div>
+</div>
+
+<script src="app.js?v=20260706a"></script>
+</body>
+</html>
