@@ -966,3 +966,11 @@ select, .seg-btns {
 @media (max-width: 560px) {
   .dol-fields button { grid-template-columns: 1fr; gap: 3px; }
 }
+
+/* ---- Back-link to the oldmachines hub site (sidebar) ---- */
+.collection-link{
+  display:inline-flex; align-items:center; gap:7px; margin:0 0 16px;
+  font:600 11px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--muted);
+}
+.collection-link:hover{ color:var(--ink); text-decoration:none; }
