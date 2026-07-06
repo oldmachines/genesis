@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inside the Sega Genesis — an oldmachines guide</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%23ff5347%27/%3E%3Crect x=%276%27 y=%278%27 width=%2720%27 height=%275%27 rx=%272%27 fill=%27%230a0b10%27/%3E%3Crect x=%279%27 y=%2718%27 width=%2714%27 height=%272.6%27 rx=%271.3%27 fill=%27%230a0b10%27 opacity=%27.55%27/%3E%3C/svg%3E">
+<meta name="description" content="Interactive, explorable teardowns of the Sega Genesis / Mega Drive hardware — one subsystem at a time. Part of the oldmachines collection.">
+<style>
+  :root{
+    --ground:#0a0b10; --ground-2:#0e1017; --panel:#14161f; --panel-2:#1b1e2a;
+    --line:#262b3a; --line-2:#343a4d; --ink:#eef1f8; --ink-2:#b3b9cc; --muted:#7e8599;
+    --red:#ff5347; --red-d:#e23b30; --blue:#3fb5ff; --gold:#ffc44d; --amber:#ff9d3c;
+    --radius:14px; --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--ground);line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(1200px 700px at 80% -10%,rgba(255,83,71,.15),transparent 60%),
+      radial-gradient(900px 600px at 0% 100%,rgba(63,181,255,.07),transparent 55%);
+    background-attachment:fixed;min-height:100vh}
+  a{color:var(--red);text-decoration:none}
+  a:hover{text-decoration:underline;text-underline-offset:3px}
+  :focus-visible{outline:2px solid var(--blue);outline-offset:3px;border-radius:6px}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 28px}
+  header.top{display:flex;align-items:center;gap:12px;padding:22px 0}
+  .logo{width:34px;height:34px;border-radius:8px;position:relative;
+    background:radial-gradient(circle at 30% 26%,#ff7368,var(--red) 55%,#8f1f18);
+    box-shadow:0 0 22px -4px rgba(255,83,71,.55),inset 0 0 0 1px rgba(255,255,255,.12)}
+  .logo::after{content:"";position:absolute;left:7px;right:7px;top:11px;height:5px;border-radius:2.5px;
+    background:rgba(10,11,16,.82)}
+  .brandline{font:600 12px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .brandline b{color:var(--ink);font-weight:700}
+  .hero{padding:52px 0 40px;border-bottom:1px solid var(--line)}
+  .eyebrow{font:600 11px/1 var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--blue);
+    display:inline-flex;align-items:center;gap:9px}
+  .eyebrow::before{content:"";width:26px;height:1px;background:var(--blue);opacity:.7}
+  h1{font:800 clamp(36px,7vw,68px)/1.02 var(--sans);letter-spacing:-.02em;margin:18px 0 0;text-wrap:balance}
+  h1 .grad{background:linear-gradient(100deg,var(--blue),var(--red) 55%,var(--gold));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{font-size:18.5px;color:var(--ink-2);max-width:60ch;margin:20px 0 0}
+  h2.sh{font:700 12px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:44px 0 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin:20px 0 0}
+  .card{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);padding:20px;transition:transform .14s,border-color .14s,background .14s}
+  a.card:hover{transform:translateY(-3px);border-color:var(--line-2);background:var(--panel-2);text-decoration:none}
+  .card .ico{width:40px;height:40px;border-radius:9px;display:grid;place-items:center;font:700 18px/1 var(--mono);
+    background:rgba(63,181,255,.1);color:var(--blue);border:1px solid rgba(63,181,255,.22)}
+  .card h3{font:700 18px/1.2 var(--sans);margin:16px 0 6px}
+  .card p{font-size:13.5px;color:var(--muted);margin:0;flex:1}
+  .card .status{margin-top:16px;font:600 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+    display:inline-flex;align-items:center;gap:7px}
+  .card .status.ready{color:var(--blue)} .card .status.soon{color:var(--muted)}
+  .card .status .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+  .card.disabled{opacity:.58}
+  .card.disabled:hover{transform:none}
+  footer{padding:40px 0 56px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);margin-top:48px}
+  footer a{color:var(--ink-2)}
+  .spec-strip{display:flex;flex-wrap:wrap;gap:10px 26px;margin:26px 0 0;font:600 11px/1.5 var(--mono);color:var(--muted)}
+  .spec-strip b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="logo" aria-hidden="true"></div>
+    <div class="brandline"><b>oldmachines</b> · the collection</div>
+  </header>
+
+  <section class="hero">
+    <span class="eyebrow">Interactive teardown · Sega · 1988</span>
+    <h1>Inside the <span class="grad">Sega Genesis</span></h1>
+    <p class="lede">
+      Explorable, hands-on explanations of how Sega's 16-bit machine — the
+      <em>Mega Drive</em> outside North America — actually worked, one subsystem
+      at a time. Not a spec sheet: each guide is a playable course you can hear,
+      drag and toggle. Two CPUs, a tile-and-sprite video chip, and the FM
+      synthesiser that gave the console its snarling voice — then, once the
+      machine is taken apart, one course hands you the keys to write your own.
+    </p>
+    <div class="spec-strip">
+      <span>CPU <b>Motorola 68000 · 7.67 MHz</b></span>
+      <span>Sound CPU <b>Zilog Z80 · 3.58 MHz</b></span>
+      <span>Video <b>Sega VDP · 320×224</b></span>
+      <span>Audio <b>YM2612 FM + SN76489</b></span>
+      <span>Media <b>ROM cartridge</b></span>
+    </div>
+  </section>
+
+  <h2 class="sh">Subsystems</h2>
+  <div class="grid">
+
+    <a class="card" href="cpu/">
+      <div class="ico">⌘</div>
+      <h3>CPU &amp; the 68000</h3>
+      <p>How processors work from zero, then the Genesis' two brains: the Motorola 68000 and its Z80 sidekick, the bus that makes them share memory, and how emulators run both in lockstep.</p>
+      <span class="status ready"><span class="dot"></span>Ready · 15 modules</span>
+    </a>
+
+    <a class="card" href="graphics/">
+      <div class="ico">▦</div>
+      <h3>Graphics &amp; the VDP</h3>
+      <p>2D tile-and-sprite rendering from zero, then the Sega VDP: two scrolling planes, the sprite engine, line-by-line raster tricks, shadow/highlight, and how emulators redraw it a scanline at a time.</p>
+      <span class="status ready"><span class="dot"></span>Ready · 16 modules</span>
+    </a>
+
+    <a class="card" href="audio/">
+      <div class="ico">♪</div>
+      <h3>Audio · FM &amp; PSG</h3>
+      <p>Sound synthesis from zero, then the chips that defined the Genesis growl: the Yamaha YM2612 six-channel FM synth and the SN76489 PSG — operators, algorithms, envelopes — all played live in your browser.</p>
+      <span class="status ready"><span class="dot"></span>Ready · 16 modules</span>
+    </a>
+
+    <a class="card" href="cartridge/">
+      <div class="ico">▤</div>
+      <h3>The cartridge</h3>
+      <p>ROM media from zero, then Genesis carts: the memory map, bank-switching mappers, the TMSS trademark check, Sonic &amp; Knuckles lock-on, and the Sega CD / 32X on the edge connector — plus how emulators load a ROM.</p>
+      <span class="status ready"><span class="dot"></span>Ready · 13 modules</span>
+    </a>
+
+    <a class="card" href="homebrew/">
+      <div class="ico">⚒</div>
+      <h3>Write your own homebrew</h3>
+      <p>Build your own Genesis software with the free SGDK toolchain and m68k-elf-gcc — full setup on Windows, macOS and Linux, from an empty folder to your own code running in an emulator and on a real flashcart.</p>
+      <span class="status ready"><span class="dot"></span>Ready · 13 modules</span>
+    </a>
+
+  </div>
+
+  <footer>
+    <p>
+      Part of <a href="https://github.com/oldmachines">oldmachines</a> — interactive
+      teardowns of the machines we grew up with. Technical content is grounded in
+      the open-source <a href="https://github.com/libretro/Genesis-Plus-GX">Genesis&nbsp;Plus&nbsp;GX</a>
+      and <a href="https://github.com/libretro/blastem">BlastEm</a> emulators
+      (and <a href="https://github.com/nukeykt/Nuked-OPN2">Nuked-OPN2</a> for the FM chip).
+      No copyrighted game assets are shipped here; every sound and picture is
+      synthesised in your browser. &ldquo;Sega&rdquo;, &ldquo;Genesis&rdquo; and
+      &ldquo;Mega&nbsp;Drive&rdquo; are trademarks of Sega; this is an independent,
+      non-commercial educational project not affiliated with Sega.
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>
