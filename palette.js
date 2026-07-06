@@ -32,10 +32,38 @@
         byKey[key].def = def;
       }
     }
+    // Merge an optional curated glossary (window.OMP_TERMS) — used by sites
+    // that don't carry [data-tip] markup (e.g. the Apple II lectures).
+    var curated = window.OMP_TERMS;
+    if (curated && curated.length) {
+      for (var c = 0; c < curated.length; c++) {
+        var item = curated[c];
+        if (!item || !item.term || !item.def) continue;
+        var ck = String(item.term).toLowerCase();
+        if (!byKey[ck]) byKey[ck] = { term: String(item.term), def: String(item.def), node: null };
+      }
+    }
     var list = [];
     for (var k in byKey) list.push(byKey[k]);
     list.sort(function (a, b) { return a.term.toLowerCase() < b.term.toLowerCase() ? -1 : 1; });
     return list;
+  }
+
+  /* Best-effort locate the first on-page mention of a term (for curated
+     glossary entries that have no source node to point at). */
+  function findFirst(term) {
+    try {
+      var lc = term.toLowerCase();
+      var tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+      var n;
+      while ((n = tw.nextNode())) {
+        var p = n.parentNode;
+        if (!p || p.tagName === 'SCRIPT' || p.tagName === 'STYLE') continue;
+        if (p.closest && p.closest('.omp-overlay,.omp-launch')) continue;
+        if ((n.nodeValue || '').toLowerCase().indexOf(lc) >= 0) return p;
+      }
+    } catch (e) { /* no-op */ }
+    return null;
   }
 
   var TERMS = harvest();
@@ -222,7 +250,7 @@
     var t = filtered[sel];
     if (!t) return;
     close();
-    var node = t.node;
+    var node = t.node || findFirst(t.term);
     if (node && node.scrollIntoView) {
       node.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'center' });
       node.classList.remove('omp-flash');
