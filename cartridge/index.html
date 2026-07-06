@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Genesis Cartridges — ROM, mappers, TMSS &amp; lock-on</title>
+<meta name="description" content="A hands-on course in three parts: how a read-only memory chip stores a game, how the Sega Genesis cartridge wires that ROM to a Motorola 68000 (the board, the memory map, the header, TMSS, mappers, saves and lock-on), and how emulators like Genesis Plus GX and BlastEm reproduce it — with interactive labs so you can see every concept, not just read it.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%23ff5347%27/%3E%3Crect x=%276%27 y=%278%27 width=%2720%27 height=%275%27 rx=%272%27 fill=%27%230a0b10%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="progress" aria-hidden="true"><div class="fill" id="progress-fill"></div></div>
+<button class="menu-btn" id="menu-btn" aria-label="Open contents">☰</button>
+<div class="scrim" id="scrim"></div>
+
+<div class="app">
+
+  <!-- ================================================= SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Genesis Carts</h1>
+        <span class="sub">A course · 13 modules</span>
+      </div>
+    </div>
+
+    <nav class="toc" aria-label="Course contents">
+      <div class="toc-group">Part I · ROM media from zero</div>
+      <a href="#rom"><span class="n">01</span><span>What a ROM is</span></a>
+      <a href="#bus"><span class="n">02</span><span>The address &amp; data bus</span></a>
+      <a href="#read"><span class="n">03</span><span>Reading a chip</span></a>
+      <a href="#endian"><span class="n">04</span><span>Endianness &amp; words</span></a>
+
+      <div class="toc-group">Part II · The Genesis cartridge</div>
+      <a href="#inside"><span class="n">05</span><span>Inside a cart</span></a>
+      <a href="#memmap"><span class="n">06</span><span>The memory map</span></a>
+      <a href="#header"><span class="n">07</span><span>The ROM header</span></a>
+      <a href="#tmss"><span class="n">08</span><span>TMSS &amp; region locking</span></a>
+      <a href="#mappers"><span class="n">09</span><span>Bank switching &amp; mappers</span></a>
+      <a href="#saves"><span class="n">10</span><span>Battery saves</span></a>
+      <a href="#lockon"><span class="n">11</span><span>Lock-on &amp; the edge connector</span></a>
+
+      <div class="toc-group">Part III · Emulating the cartridge</div>
+      <a href="#loading"><span class="n">12</span><span>Loading a ROM</span></a>
+      <a href="#try"><span class="n">13</span><span>Try it in an emulator</span></a>
+
+      <div class="progress-note">Progress · <b id="pct">0%</b></div>
+    </nav>
+  </aside>
+
+  <!-- ================================================= MAIN =============== -->
+  <main class="main">
+
+    <!-- ------------------------------------------------ HERO -------------- -->
+    <header class="hero">
+      <canvas id="hero-cart" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <div class="inner">
+          <span class="eyebrow">An interactive course · Genesis Plus GX &amp; BlastEm</span>
+          <h2>How the <span class="grad">Genesis</span> read its games.</h2>
+          <p class="lede">
+            We start from the very beginning — how a chip can hold a game as
+            nothing but frozen 1s and 0s — assuming you know nothing about
+            memory. Once the vocabulary is solid, we open up a Sega Genesis
+            (Mega Drive) cartridge and the Motorola 68000 that reads it: the
+            board, the memory map, the header, region locks, mappers, battery
+            saves and the famous lock-on trick. Then we follow the ROM into an
+            emulator. Thirteen modules, each with <strong>live simulations</strong>
+            so you can watch every idea, not just read it. No game data ships
+            with this page; every ROM you'll see is synthesised in your browser.
+          </p>
+          <div class="cta-row">
+            <a class="btn primary" href="#rom">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Begin Part I
+            </a>
+            <a class="btn" href="#inside">Skip to the cartridge</a>
+          </div>
+
+          <div class="arc-cards">
+            <a class="arc" href="#part-1">
+              <div class="an">PART I</div>
+              <h4>ROM media</h4>
+              <p>Mask ROM versus RAM, the address and data bus, chip-select timing, and why the 68000 is big-endian — the universal vocabulary of memory, explained from zero.</p>
+              <div class="cnt">4 modules · 3 labs</div>
+            </a>
+            <a class="arc" href="#part-2">
+              <div class="an">PART II</div>
+              <h4>The Genesis cartridge</h4>
+              <p>The board and edge connector, the 68000 memory map, the ROM header, TMSS &amp; region locks, mappers &amp; bank switching, battery saves, and lock-on.</p>
+              <div class="cnt">7 modules · 4 labs</div>
+            </a>
+            <a class="arc" href="#part-3">
+              <div class="an">PART III</div>
+              <h4>Emulating the cartridge</h4>
+              <p>How Genesis Plus GX and BlastEm turn a <code>.bin</code>/<code>.md</code> file back into a cartridge: header detection, mapper detection and save files.</p>
+              <div class="cnt">2 modules</div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+
+      <!-- ============================================ PART I ============== -->
+      <section class="part" id="part-1">
+        <div class="part-inner">
+          <div class="kicker">Part I</div>
+          <h3>ROM media from zero</h3>
+          <p>
+            This first part is pure fundamentals — nothing about any specific
+            console yet. It's how <em>every</em> read-only memory works, whether
+            that's the chip in a Genesis cartridge, an old arcade board, or the
+            BIOS on a PC. We build the vocabulary one word at a time — bit,
+            byte, address, data, bus, chip-select, big-endian — and you can
+            watch each idea run live in a simulation. If a term is ever used
+            before it's explained, that's a bug; tell us. Everything in Parts II
+            and III is just these four ideas wired together.
+          </p>
+          <div class="part-meta"><span>Modules <b>01–04</b></span><span>Difficulty <b>Absolute beginner</b></span><span>Labs <b>3 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 01 --- -->
+      <section class="doc" id="rom">
+        <div class="mod-head">
+          <span class="eye">Module 01 <span class="part-tag">· Part I</span></span>
+          <h3>What a ROM is</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand, from scratch, what a read-only memory chip actually is — how it differs from RAM, and how handing it an address makes a byte of your game appear.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A Genesis game is not a program that lives &ldquo;inside the
+            console.&rdquo; It lives inside the cartridge, in a single chip
+            called a <strong>ROM</strong> — <em>Read-Only Memory</em>. Picture
+            that chip as an enormous grid of tiny cells, each holding one
+            <strong>bit</strong>: a single 1 or 0, stored as the presence or
+            absence of a connection etched into the silicon at the factory.
+            Group eight bits and you have a <strong>byte</strong> — a number
+            from 0 to 255. A Genesis cartridge is, at heart, a few million of
+            those bytes, frozen in place and never changing again.
+          </p>
+          <p>
+            The word that matters most is <strong>read-only</strong>. The
+            pattern of bits was pressed into the chip when it was manufactured —
+            this style of chip is a
+            <span class="term" data-tip="A ROM whose contents are defined by a photographic mask during fabrication. Cheap in bulk, impossible to change afterwards — the classic game-cartridge chip.">mask ROM</span>
+            — and nothing the console does can alter a single one of them. Contrast
+            that with <span class="term" data-tip="Random-Access Memory: read/write memory that forgets everything the instant power is removed. The Genesis has 64 KB of it for the 68000 to scribble in.">RAM</span>,
+            <em>Random-Access Memory</em>, the console's scratch pad: the 68000
+            can write to RAM freely, but it forgets everything the moment you
+            switch off. The division is the whole architecture of a cartridge
+            machine — the <em>unchanging</em> game lives in cartridge ROM, the
+            <em>changing</em> state (where Sonic is standing, how many rings you
+            have) lives in console RAM.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A printed book versus a notebook</span>
+            <p>
+              A <span class="term" data-tip="Mask ROM: the bit pattern is fixed at manufacture, like ink printed on a page.">mask ROM</span>
+              is a printed book: the words were set in ink at the printers and
+              are identical in every copy, forever — you can read any page
+              instantly but you cannot change a letter. <span class="term" data-tip="RAM: freely writable, but empty again every time the power cycles.">RAM</span>
+              is the blank notebook beside it: you scribble, erase and
+              rewrite as much as you like, but close the cover (cut the power)
+              and it's blank again next time. The console reads the book and
+              works in the notebook. The cartridge <em>is</em> the book.
+            </p>
+          </div>
+
+          <h4>Addressing: how you ask for a byte</h4>
+          <p>
+            How does the console get one specific byte out of millions? Every
+            byte in the ROM has a numbered slot, its <strong>address</strong> —
+            byte 0, byte 1, byte 2, and so on. To read, the console places an
+            address onto the chip's <span class="term" data-tip="The set of wires that carry the address — the number of the byte you want to read — from the CPU to the memory chip.">address lines</span>
+            (a set of wires, one per bit of the address), and the chip responds
+            by driving the byte stored there back out on its
+            <span class="term" data-tip="The set of wires that carry the byte the chip is currently outputting back to the CPU.">data lines</span>.
+            There is no searching and no waiting for a mechanism to move — any
+            byte is reachable in the same tiny sliver of time as any other,
+            which is exactly what <em>random access</em> means. Give it an
+            address, get back a byte. That's the entire contract of a ROM, and
+            everything else in this course is built on it.
+          </p>
+          <p>
+            The lab below is that contract made visible. A little 256-byte ROM
+            sits in the middle as a grid of cells. Set an address on the red
+            address lines — by hand, or let it sweep like a CPU walking through
+            memory — and watch the matching cell light up and drive its byte
+            onto the blue data lines. Nothing moves, nothing wears; the same
+            address always returns the same byte, because the byte was baked in
+            at the factory and can never change.
+          </p>
+
+          <div class="lab" id="lab-rom">
+            <div class="lab-head"><span class="dot"></span><span class="title">ROM scope — clock an address in, read a byte out</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-tall" aria-label="A 256-byte ROM shown as a cell grid; setting an address lights up a cell and drives its byte onto the data bus"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Address (A7…A0)</label>
+                  <input type="range" min="0" max="255" value="0" step="1" data-rom-addr aria-label="ROM address">
+                </div>
+                <button class="play-btn" data-rom-clock>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Clock next address
+                </button>
+                <div class="ctrl">
+                  <label>Auto-sweep</label>
+                  <div class="seg-btns" role="group" aria-label="Auto sweep">
+                    <button class="on" data-rom-sweep="off">off</button>
+                    <button data-rom-sweep="on">walk memory</button>
+                  </div>
+                </div>
+                <div class="readouts">
+                  <span class="readout">Address <b data-rom-a>$00</b></span>
+                  <span class="readout">Data <b data-rom-d>$00</b></span>
+                </div>
+                <span class="sim-note">The 256 bytes are a fixed factory pattern. Every address always returns the same byte — that's what read-only means.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A Genesis game is stored as fixed bits in a cartridge <strong>mask ROM</strong> — set once at the factory, unchangeable forever.</li>
+              <li>ROM is read-only and permanent; RAM is read/write but forgets on power-off. Game in ROM, running state in RAM.</li>
+              <li>Every byte has an <strong>address</strong>; you read by placing the address on the address lines and taking the byte off the data lines.</li>
+              <li>&ldquo;Random access&rdquo; means any byte is reachable equally fast — no seeking, no moving parts.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a class="disabled" aria-disabled="true"><span class="dir">← Prev</span><span class="ttl">Start of course</span></a>
+            <a class="next" href="#bus"><span class="dir">Next →</span><span class="ttl">02 · The address &amp; data bus</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 02 --- -->
+      <section class="doc" id="bus">
+        <div class="mod-head">
+          <span class="eye">Module 02 <span class="part-tag">· Part I</span></span>
+          <h3>The address &amp; data bus</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the two bundles of wires that connect the 68000 to everything else, and follow one complete read across them — address out, data back, handshake done.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Module 01 showed a chip answering an address. Now let's see the wires
+            that carry the question and the answer. A <strong>bus</strong> is
+            just a shared bundle of wires that several devices connect to. The
+            Genesis's main processor — a <span class="term" data-tip="Motorola 68000: the Genesis's main CPU, running at about 7.67 MHz (NTSC). 16-bit data bus, 24-bit address bus, 32-bit internal registers.">Motorola 68000</span>
+            — talks to the cartridge, the RAM and the video chip over two of
+            them: the <strong>address bus</strong> and the <strong>data
+            bus</strong>.
+          </p>
+          <p>
+            The <strong>address bus</strong> carries the number of the location
+            the CPU wants. The 68000 has a <strong>24-bit</strong> address bus,
+            which means 2<sup>24</sup> = <strong>16,777,216</strong> distinct
+            addresses — a 16&nbsp;MB space. (Internally the chip works with
+            32-bit registers, but only 24 of those bits reach the outside
+            world.) The <strong>data bus</strong> carries the actual value to or
+            from that location, and it is <strong>16 bits</strong> wide: the
+            68000 is a 16-bit machine on the outside, moving two bytes at a time.
+            One number of wires sets <em>how much you can address</em>; the other
+            sets <em>how much you move per trip</em>.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A vast warehouse with numbered bins</span>
+            <p>
+              Think of memory as a warehouse of numbered bins. The
+              <strong>address bus</strong> is the slip you hand the clerk with a
+              bin number written on it — 24 bits of slip means 16&nbsp;million
+              possible bins. The <strong>data bus</strong> is the conveyor that
+              brings the bin's contents back — 16 bits wide, so it carries two
+              bytes per trip. A wider slip means more bins you can name; a wider
+              conveyor means more you can haul each time. The two are
+              independent, and the 68000 chose 24 and 16.
+            </p>
+          </div>
+
+          <h4>One read, as a handshake</h4>
+          <p>
+            A single read isn't instantaneous — it's a short, strict
+            conversation timed by the CPU's clock, using a few extra
+            <span class="term" data-tip="Individual wires that coordinate a bus transfer: /AS says 'address is valid', /LDS and /UDS say which byte(s) are wanted, R/W says read or write, and /DTACK is the device replying 'data is ready'.">control signals</span>.
+            The 68000 first puts the address on the bus and pulls a wire called
+            <code>/AS</code> (Address Strobe) low to announce &ldquo;this address
+            is valid.&rdquo; It signals a read by holding <code>R/W</code> high,
+            and uses <code>/UDS</code> and <code>/LDS</code> (Upper/Lower Data
+            Strobe) to say whether it wants the upper byte, the lower byte, or
+            both of the 16-bit word. The addressed device — the ROM, say —
+            decodes the address, drives its data onto the data bus, and pulls
+            <code>/DTACK</code> (Data Transfer ACKnowledge) low to say
+            &ldquo;here it is.&rdquo; The CPU latches the word and releases the
+            strobes. That five-beat dance happens millions of times a second,
+            for every instruction and every byte of every sprite.
+          </p>
+          <p>
+            The lab runs exactly that handshake in slow motion. Pick a target —
+            a word in the cartridge, in work RAM, or a video-chip port — and
+            step or run the cycle. Watch the address travel from the 68000 to
+            the device, the control strobes light up in order, and the 16-bit
+            data word travel back, acknowledged by <code>/DTACK</code>. That is
+            the atom of everything the console does.
+          </p>
+
+          <div class="lab" id="lab-bus">
+            <div class="lab-head"><span class="dot"></span><span class="title">Bus lab — one 68000 read cycle, step by step</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-tall" aria-label="A 68000 and a memory device with an address bus and data bus between them, animating the phases of a read cycle"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Read from</label>
+                  <div class="seg-btns wrap" role="group" aria-label="Bus target">
+                    <button data-bus-target="reset">$000004 reset vec</button>
+                    <button class="on" data-bus-target="rom">$000100 ROM</button>
+                    <button data-bus-target="ram">$FF0000 RAM</button>
+                    <button data-bus-target="vdp">$C00000 VDP</button>
+                  </div>
+                </div>
+                <button class="play-btn" data-bus-run>Pause</button>
+                <button class="reset-btn" data-bus-step>Step ▸</button>
+                <div class="readouts">
+                  <span class="readout">Phase <b data-bus-phase>S0</b></span>
+                  <span class="readout">Address <b data-bus-addr>$000100</b></span>
+                  <span class="readout">Data <b data-bus-data>—</b></span>
+                </div>
+                <span class="sim-note">/AS = address strobe, /UDS /LDS = data strobes, /DTACK = device acknowledges. R/W stays high for a read.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A <strong>bus</strong> is shared wiring; the 68000 uses an address bus and a data bus to reach every device.</li>
+              <li>The address bus is <strong>24 bits</strong> → a 16 MB space; the data bus is <strong>16 bits</strong> → two bytes moved per access.</li>
+              <li>A read is a timed handshake: address + /AS out, data strobes assert, the device drives data and answers with /DTACK.</li>
+              <li>Every instruction and asset the console touches is built from millions of these little cycles.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#rom"><span class="dir">← Prev</span><span class="ttl">01 · What a ROM is</span></a>
+            <a class="next" href="#read"><span class="dir">Next →</span><span class="ttl">03 · Reading a chip</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 03 --- -->
+      <section class="doc" id="read">
+        <div class="mod-head">
+          <span class="eye">Module 03 <span class="part-tag">· Part I</span></span>
+          <h3>Reading a chip</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn the two small control pins — chip-select and output-enable — that let many chips share one bus without ever shouting over each other.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A bus is a <em>shared</em> set of wires, and that raises an obvious
+            danger. The ROM, the RAM and the video chip are all wired to the same
+            16 data lines. If two of them tried to drive those lines at once — one
+            pushing a wire high while another pulls it low — you'd get a short and
+            garbage data. So every chip on the bus must stay politely silent until
+            it, and only it, is spoken to. Two tiny control pins arrange that.
+          </p>
+          <p>
+            The first is <strong>chip-select</strong>, usually written
+            <span class="term" data-tip="A pin that switches a whole chip on for this access. The leading slash means it is active-low: the chip is selected when the pin is pulled LOW.">/CS</span>
+            (the leading slash means &ldquo;active-low&rdquo; — the chip is
+            selected when this pin is pulled <em>low</em>). Some external logic,
+            the <span class="term" data-tip="Logic that watches the high address lines and decides which chip should respond to the current address — pulling exactly one chip's /CS low.">address decoder</span>,
+            watches the upper address bits and pulls exactly one chip's /CS low
+            per access. An address in the cartridge range selects the ROM; an
+            address in the RAM range selects the RAM; nobody else stirs.
+          </p>
+          <p>
+            The second is <strong>output-enable</strong>,
+            <span class="term" data-tip="A pin that connects a selected chip's data outputs to the bus. Only when /OE is low does the chip actually drive the data lines.">/OE</span>,
+            and it controls the chip's mouth. A chip can be <em>selected</em> yet
+            still not driving the bus; only when /OE goes low does it actually
+            connect its outputs and push the byte out. When /OE is high, the
+            outputs sit in a special third state — neither high nor low but
+            <span class="term" data-tip="A third output state, neither driving high nor low. A chip in high-impedance is electrically 'let go' of the bus, so another chip can drive it.">high-impedance</span>
+            (&ldquo;hi-Z&rdquo;), electrically disconnected, letting go of the
+            wires entirely. That hi-Z state is the secret to sharing: an unselected
+            chip isn't fighting for the bus, it has physically released it.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A conference call with a moderator</span>
+            <p>
+              Everyone is on the same line, so everyone keeps muted by default.
+              The moderator (the address decoder) un-mutes exactly one person for
+              each question: <span class="term" data-tip="Chip-select: picks which chip is 'un-muted' for this access.">/CS</span>
+              is being un-muted, and <span class="term" data-tip="Output-enable: actually starting to speak once un-muted.">/OE</span>
+              is that person actually beginning to speak. Everyone else stays in
+              <span class="term" data-tip="High-impedance: electrically silent, hands off the shared wires.">high-impedance</span>
+              silence, hands off the wires, so the single speaker is heard
+              cleanly. No moderator, and it's just noise.
+            </p>
+          </div>
+
+          <h4>Access time: the ROM's one performance number</h4>
+          <p>
+            From the moment a valid address and /CS/OE arrive, a mask ROM takes a
+            small but non-zero time to settle its outputs to the correct byte —
+            its <span class="term" data-tip="Access time: the delay between a valid address arriving and the correct data being stable on the outputs. Genesis-era mask ROMs were around 150–200 nanoseconds.">access time</span>,
+            quoted in nanoseconds (Genesis-era mask ROMs were commonly around
+            150–200&nbsp;ns). The console's bus timing has to allow at least that
+            long before it latches, which is precisely what <code>/DTACK</code>
+            from Module 02 is negotiating. A slower chip simply asks the CPU to
+            wait a beat longer. Nothing here is exotic — it's the reason the
+            handshake exists at all: the wires are instant, but the silicon at
+            the far end needs a moment to answer.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 260" role="img" aria-label="Timing of a chip read: the address becomes valid, chip-select and output-enable go low, and after the access time the data becomes valid on the bus.">
+              <text x="60" y="28" class="d-tag">One chip read, as signal timing (active-low signals drawn low = asserted)</text>
+              <!-- address -->
+              <text x="60" y="70" class="d-sub">ADDR</text>
+              <path d="M120,78 L150,78 L165,60 L860,60" fill="none" class="d-wave-v"/>
+              <text x="500" y="52" class="d-flow d-red">valid address on the bus</text>
+              <!-- /CS -->
+              <text x="60" y="118" class="d-sub">/CS</text>
+              <path d="M120,104 L200,104 L215,128 L820,128 L835,104 L860,104" fill="none" class="d-wave-c"/>
+              <text x="500" y="146" class="d-flow d-blue">chip selected (low)</text>
+              <!-- /OE -->
+              <text x="60" y="176" class="d-sub">/OE</text>
+              <path d="M120,162 L230,162 L245,186 L810,186 L825,162 L860,162" fill="none" class="d-wave-c"/>
+              <text x="500" y="204" class="d-flow d-blue">outputs enabled (low)</text>
+              <!-- DATA -->
+              <text x="60" y="236" class="d-sub">DATA</text>
+              <path d="M120,236 L360,236 L380,220 L800,220 L820,236 L860,236" fill="none" class="d-wave-m"/>
+              <line x1="245" y1="196" x2="380" y2="220" class="d-stem"/>
+              <text x="386" y="216" class="d-flow d-gold">← access time → data valid</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The read, timed.</strong> A valid <span class="term" data-tip="The address the CPU is presenting on the address bus.">address</span> appears; the decoder pulls <span class="term" data-tip="Chip-select — un-mutes this chip.">/CS</span> and then <span class="term" data-tip="Output-enable — the chip starts driving the data bus.">/OE</span> low; and after the ROM's <span class="term" data-tip="Access time — the settling delay of the mask ROM, ~150–200 ns on the Genesis.">access time</span> the correct byte is finally stable on the data lines, ready for the CPU to latch.</figcaption>
+          </figure>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Many chips share one data bus, so all but one must stay electrically silent at any instant.</li>
+              <li><strong>/CS</strong> (chip-select) picks which chip responds; the address decoder pulls exactly one low per access.</li>
+              <li><strong>/OE</strong> (output-enable) connects the selected chip's outputs to the bus; unselected chips sit in <strong>high-impedance</strong>, hands off the wires.</li>
+              <li>A ROM's <strong>access time</strong> (~150–200 ns) is the settling delay the bus handshake (/DTACK) must respect.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#bus"><span class="dir">← Prev</span><span class="ttl">02 · The address &amp; data bus</span></a>
+            <a class="next" href="#endian"><span class="dir">Next →</span><span class="ttl">04 · Endianness &amp; words</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 04 --- -->
+      <section class="doc" id="endian">
+        <div class="mod-head">
+          <span class="eye">Module 04 <span class="part-tag">· Part I</span></span>
+          <h3>Endianness &amp; words</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn how the 68000 groups bytes into words and longwords, and why the order it stores them in — big-endian — matters for every multi-byte value in a Genesis ROM.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The data bus is 16 bits, so the 68000 naturally thinks in units
+            bigger than a byte. A <strong>byte</strong> is 8 bits; a
+            <strong>word</strong>, in 68000 terms, is <strong>16 bits</strong>
+            (two bytes); a <strong>longword</strong> is <strong>32 bits</strong>
+            (four bytes). Addresses, jump targets and the header fields you'll
+            meet in Module 07 are mostly words and longwords. But the moment a
+            value spans more than one byte, a question appears that has started
+            real arguments between real engineers: <em>which byte goes first?</em>
+          </p>
+          <p>
+            Take the 32-bit value <code>$53454741</code>. It's built from four
+            bytes: <code>$53</code>, <code>$45</code>, <code>$47</code>,
+            <code>$41</code>. When you store it at some address, do you put the
+            <em>most</em>-significant byte (<code>$53</code>) at the lowest
+            address, or the <em>least</em>-significant one (<code>$41</code>)?
+            The first choice is called <span class="term" data-tip="Big-endian: the most-significant byte is stored at the lowest address — you write the value 'big end first', the way we write decimal numbers. The 68000 is big-endian.">big-endian</span>;
+            the second is <span class="term" data-tip="Little-endian: the least-significant byte is stored at the lowest address. Used by x86 and others — but NOT by the 68000.">little-endian</span>.
+            The <strong>Motorola 68000 is big-endian</strong>: the big end goes
+            first, at the lowest address — exactly the order we write numbers on
+            paper. This is not a small footnote; it is baked into every
+            multi-byte number in every Genesis ROM.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Writing the date</span>
+            <p>
+              Endianness is the byte-level version of an argument you already
+              know: is today 2024-01-31 (year first, biggest unit first) or
+              31/01/2024 (day first, smallest unit first)? Neither is
+              &ldquo;wrong&rdquo; — but if a writer and a reader disagree about
+              the convention, they'll read <em>January</em> as the 31st month
+              and get nonsense. The 68000 always writes the biggest unit first:
+              <span class="term" data-tip="Big-endian: biggest byte at the lowest address, like year-first dates.">big-endian</span>.
+              A tool that assumes the other order will read every word in the ROM
+              byte-swapped — a real and common bug.
+            </p>
+          </div>
+
+          <p>
+            There's a lovely, concrete reason this matters for Genesis
+            preservation. The very first bytes of a cartridge's readable header
+            spell <code>SEGA</code> in ASCII: <code>$53 $45 $47 $41</code>.
+            Because the 68000 stores them big-endian, dumping the ROM and reading
+            the bytes in address order gives you the letters <code>S E G A</code>
+            in the right order. If you ever open a ROM and see <code>ESAG</code>,
+            you're looking at a byte-swapped dump — a classic sign of a tool that
+            got the endianness wrong, and something Module 12's loaders actively
+            check for.
+          </p>
+          <p>
+            The lab lets you play both sides. Type a 32-bit value, choose
+            big-endian (the 68000) or little-endian, and watch the four bytes
+            drop into memory. Then read them back as a byte, a word, or a
+            longword — and tap a cell to move where the read starts. Leave it on
+            the default <code>$53454741</code> and flip the endianness to see
+            <code>SEGA</code> turn into <code>AGES</code> before your eyes.
+          </p>
+
+          <div class="lab" id="lab-endian">
+            <div class="lab-head"><span class="dot"></span><span class="title">Endianness explorer — byte, word &amp; longword</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-mid" aria-label="A 32-bit value laid out as four memory bytes in big- or little-endian order, with a selectable read size and offset"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>32-bit value (hex)</label>
+                  <input class="hex-in" type="text" value="53454741" maxlength="8" spellcheck="false" data-endian-input aria-label="32-bit hex value">
+                </div>
+                <div class="ctrl">
+                  <label>Byte order</label>
+                  <div class="seg-btns" role="group" aria-label="Endianness">
+                    <button class="on" data-endian-mode="big">big-endian (68000)</button>
+                    <button data-endian-mode="little">little-endian</button>
+                  </div>
+                </div>
+                <div class="ctrl">
+                  <label>Read size</label>
+                  <div class="seg-btns" role="group" aria-label="Read size">
+                    <button data-endian-size="1">byte</button>
+                    <button data-endian-size="2">word</button>
+                    <button class="on" data-endian-size="4">long</button>
+                  </div>
+                </div>
+                <div class="readouts">
+                  <span class="readout">Read value <b data-endian-out>$53454741</b></span>
+                  <span class="readout">As text <b data-endian-ascii>"SEGA"</b></span>
+                </div>
+                <span class="sim-note">Tap a memory cell to move the read start. Try $53454741 and flip to little-endian to watch SEGA become AGES.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>68000 sizes: <strong>byte</strong> = 8 bits, <strong>word</strong> = 16 bits, <strong>longword</strong> = 32 bits.</li>
+              <li><strong>Endianness</strong> is the order multi-byte values are stored in; the 68000 is <strong>big-endian</strong> — most-significant byte at the lowest address.</li>
+              <li>The header's <code>SEGA</code> tag reads correctly precisely because the machine is big-endian; <code>ESAG</code> means a byte-swapped dump.</li>
+              <li>Get endianness wrong and every word in the ROM comes out byte-swapped — a mistake emulators guard against on load.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#read"><span class="dir">← Prev</span><span class="ttl">03 · Reading a chip</span></a>
+            <a class="next" href="#inside"><span class="dir">Next → Part II</span><span class="ttl">05 · Inside a cart</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART II ============= -->
+      <section class="part" id="part-2">
+        <div class="part-inner">
+          <div class="kicker">Part II</div>
+          <h3>The Genesis cartridge</h3>
+          <p>
+            Now we put the Part&nbsp;I toolkit into a real machine. A Sega
+            Genesis cartridge is a small circuit board that wires one or more ROM
+            chips — and sometimes a save chip and a mapper — to a 64-pin edge
+            connector that plugs straight onto the 68000's bus. These seven
+            modules cover the board itself, the 24-bit memory map the ROM lives
+            in, the header that describes the game, the TMSS region lock, the
+            mappers that break the 4&nbsp;MB ceiling, battery-backed saves, and
+            the ingenious lock-on passthrough. From here on we name real
+            hardware, but every piece maps back to a fundamental you already know.
+          </p>
+          <div class="part-meta"><span>Modules <b>05–11</b></span><span>Difficulty <b>Hardware</b></span><span>Labs <b>4 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 05 --- -->
+      <section class="doc" id="inside">
+        <div class="mod-head">
+          <span class="eye">Module 05 <span class="part-tag">· Part II</span></span>
+          <h3>Inside a cart</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Open a Genesis cartridge and identify every part: the ROM chip, the board, and the edge connector that drops the ROM straight onto the 68000's bus.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Crack open a Genesis cartridge and there is startlingly little
+            inside: a small printed circuit board, usually one big
+            <strong>mask ROM</strong> chip, and a row of gold-plated fingers
+            along the bottom edge. That's often the entire game. There's no
+            processor in the cartridge, no operating system, no drive — the
+            cartridge is pure memory, and the console supplies everything else.
+            Compared to the optical drives and custom silicon of later consoles,
+            a Genesis cart is almost brutally simple, and that simplicity is
+            exactly why it starts a game the instant you flick the power switch:
+            there is nothing to spin up and nothing to load.
+          </p>
+          <p>
+            The row of fingers is the <span class="term" data-tip="The gold-plated contacts along the bottom of the cartridge that mate with the console's slot, carrying the bus signals directly to the 68000.">edge connector</span>:
+            64 contacts that mate with the slot inside the console. Crucially,
+            those contacts are not some abstract &ldquo;cartridge protocol&rdquo;
+            — they are, almost literally, the 68000's own bus brought out to the
+            edge of the board. The address lines, the 16 data lines, the control
+            strobes from Module 02, power and ground: all of it runs to the pins.
+            When you insert a cartridge, you are physically extending the
+            console's memory bus onto the cartridge's ROM chip. The ROM appears
+            in the machine's address space (Module 06 draws exactly where), and
+            the CPU reads it with the same handshake it uses for its own RAM.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A book dropped onto the library shelf</span>
+            <p>
+              The console is a library with a numbered shelving system but no
+              books of its own. A cartridge is a book whose spine is printed with
+              the exact call numbers of an empty section of shelf. Slot it in and
+              its pages instantly &ldquo;exist&rdquo; at those call numbers — the
+              librarian (the 68000) can walk straight to any page. The
+              <span class="term" data-tip="The gold contacts that hand the console the cartridge's ROM directly on the CPU bus.">edge connector</span>
+              is the spine label lining up with the shelf's numbering. Nothing is
+              copied or installed; the book simply becomes part of the library's
+              address space.
+            </p>
+          </div>
+
+          <h4>What else can live on the board</h4>
+          <p>
+            Most carts are just ROM, but the board has room for more, and the
+            rest of Part II is a tour of the extras:
+          </p>
+          <ul>
+            <li><strong>Extra ROM + a mapper.</strong> Games bigger than the 68000's flat 4&nbsp;MB cartridge window carry additional ROM plus a small chip that swaps chunks of it into view — <span class="term" data-tip="Bank switching: a mapper chip on the cart pages large ROM into the CPU's limited window a bank at a time. Module 09.">bank switching</span>, the subject of Module 09.</li>
+            <li><strong>A save chip + battery.</strong> RPGs and sports games add <span class="term" data-tip="Static RAM kept alive by a small battery so your saved game survives power-off. Module 10.">battery-backed SRAM</span> (or a serial EEPROM) so your progress survives the power switch — Module 10.</li>
+            <li><strong>A passthrough slot.</strong> One remarkable cartridge, <em>Sonic &amp; Knuckles</em>, has a second slot on top to accept another cart and combine with it — the <span class="term" data-tip="Lock-on technology: a cartridge with a passthrough slot that merges with the game plugged into it. Module 11.">lock-on</span> trick of Module 11.</li>
+          </ul>
+          <p>
+            But hold the simple picture in your head first: a board, a ROM, and
+            64 gold fingers that are the CPU bus itself. Everything else is an
+            addition to that foundation.
+          </p>
+
+          <div class="specs">
+            <div class="spec"><div class="k">Contents</div><div class="v">1<small> chip</small></div><div class="d">usually a single mask ROM</div></div>
+            <div class="spec"><div class="k">Edge pins</div><div class="v">64</div><div class="d">the 68000 bus, brought out</div></div>
+            <div class="spec"><div class="k">Flat window</div><div class="v">4<small> MB</small></div><div class="d">$000000–$3FFFFF</div></div>
+            <div class="spec"><div class="k">Data width</div><div class="v">16<small>-bit</small></div><div class="d">two bytes per access</div></div>
+            <div class="spec"><div class="k">Boot time</div><div class="v">instant</div><div class="d">nothing to spin up</div></div>
+            <div class="spec"><div class="k">Extras</div><div class="v">opt.</div><div class="d">mapper · SRAM · lock-on</div></div>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 260" role="img" aria-label="A Genesis cartridge board: a ROM chip wired to a 64-pin edge connector that carries the address bus, data bus and control lines to the console.">
+              <rect x="120" y="40" width="660" height="150" rx="12" class="d-fill-panel d-stroke-line" stroke-width="1.5"/>
+              <text x="140" y="66" class="d-tag">cartridge board</text>
+              <!-- ROM chip -->
+              <rect x="330" y="80" width="230" height="72" rx="8" class="d-fill-panel2 d-blue-s" stroke-width="1.6"/>
+              <text x="445" y="112" text-anchor="middle" class="d-label" style="font-size:14px">MASK ROM</text>
+              <text x="445" y="132" text-anchor="middle" class="d-sub">your game, frozen in silicon</text>
+              <!-- traces down to connector -->
+              <path d="M360,152 L360,196" class="d-red-s" stroke-width="1.6" fill="none"/>
+              <path d="M420,152 L420,196" class="d-blue-s" stroke-width="1.6" fill="none"/>
+              <path d="M480,152 L480,196" class="d-gold-s" stroke-width="1.6" fill="none"/>
+              <path d="M530,152 L530,196" class="d-stroke-line" stroke-width="1.6" fill="none"/>
+              <!-- edge connector -->
+              <rect x="150" y="196" width="600" height="26" rx="3" class="d-fill-ground d-stroke-line" stroke-width="1.2"/>
+              <g fill="#ffc44d">
+                <rect x="164" y="200" width="8" height="18"/><rect x="184" y="200" width="8" height="18"/>
+                <rect x="204" y="200" width="8" height="18"/><rect x="224" y="200" width="8" height="18"/>
+                <rect x="244" y="200" width="8" height="18"/><rect x="264" y="200" width="8" height="18"/>
+                <rect x="284" y="200" width="8" height="18"/><rect x="304" y="200" width="8" height="18"/>
+                <rect x="324" y="200" width="8" height="18"/><rect x="344" y="200" width="8" height="18"/>
+                <rect x="364" y="200" width="8" height="18"/><rect x="384" y="200" width="8" height="18"/>
+                <rect x="404" y="200" width="8" height="18"/><rect x="424" y="200" width="8" height="18"/>
+                <rect x="444" y="200" width="8" height="18"/><rect x="464" y="200" width="8" height="18"/>
+                <rect x="484" y="200" width="8" height="18"/><rect x="504" y="200" width="8" height="18"/>
+                <rect x="524" y="200" width="8" height="18"/><rect x="544" y="200" width="8" height="18"/>
+                <rect x="564" y="200" width="8" height="18"/><rect x="584" y="200" width="8" height="18"/>
+                <rect x="604" y="200" width="8" height="18"/><rect x="624" y="200" width="8" height="18"/>
+                <rect x="644" y="200" width="8" height="18"/><rect x="664" y="200" width="8" height="18"/>
+                <rect x="684" y="200" width="8" height="18"/><rect x="704" y="200" width="8" height="18"/>
+                <rect x="724" y="200" width="8" height="18"/>
+              </g>
+              <text x="360" y="244" text-anchor="middle" class="d-sub d-red">address</text>
+              <text x="420" y="244" text-anchor="middle" class="d-sub d-blue">data</text>
+              <text x="482" y="244" text-anchor="middle" class="d-sub d-gold">/CS /OE</text>
+              <text x="536" y="244" text-anchor="middle" class="d-sub">Vcc · GND</text>
+              <text x="150" y="240" class="d-sub">edge connector · 64 contacts = the 68000 bus, brought to the board's edge</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>A cartridge, laid bare.</strong> A single <span class="term" data-tip="The chip that holds the whole game as fixed bits.">mask ROM</span> wired to a 64-contact <span class="term" data-tip="Gold fingers carrying the CPU bus onto the board.">edge connector</span>. The connector isn't a special protocol — it's the address bus, the 16 data lines and the control strobes from Modules 02–03, handed straight to the ROM.</figcaption>
+          </figure>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A Genesis cartridge is usually just a board with one mask ROM and a 64-contact edge connector — no CPU of its own.</li>
+              <li>The edge connector <em>is</em> the 68000's bus, extended onto the board; inserting a cart maps its ROM into the console's address space.</li>
+              <li>That directness is why cartridge games boot instantly: nothing loads or spins up.</li>
+              <li>Optional extras — a mapper, a save chip + battery, or a lock-on passthrough — sit on the same board, and fill the rest of Part II.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#endian"><span class="dir">← Prev · Part I</span><span class="ttl">04 · Endianness &amp; words</span></a>
+            <a class="next" href="#memmap"><span class="dir">Next →</span><span class="ttl">06 · The memory map</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 06 --- -->
+      <section class="doc" id="memmap">
+        <div class="mod-head">
+          <span class="eye">Module 06 <span class="part-tag">· Part II</span></span>
+          <h3>The memory map</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Read the 68000's 16 MB address space like a map: where the cartridge ROM sits, where work RAM lives, and where the Z80, I/O and VDP appear.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The 68000's 24-bit bus gives it one flat <strong>16&nbsp;MB</strong>
+            address space, and the Genesis hardware designers divided that space
+            into regions, each assigned to a different device by the address
+            decoder of Module 03. This layout — the <strong>memory map</strong> —
+            is the single most important diagram in the whole system, because it
+            tells you what answers when the CPU touches any given address. Learn
+            it and the rest of Part II falls into place.
+          </p>
+          <p>
+            Here are the landmarks, low addresses first:
+          </p>
+          <ul>
+            <li><strong>$000000–$3FFFFF — cartridge ROM.</strong> The cartridge occupies the bottom 4&nbsp;MB. The 68000 starts here: the first eight bytes are the <span class="term" data-tip="The first two longwords of the ROM: the initial stack pointer and the address of the first instruction the 68000 runs. The console jumps here at power-on.">reset vectors</span> (initial stack pointer, then the address of the first instruction), so at power-on the CPU literally begins executing out of your cartridge. Larger games reach beyond 4&nbsp;MB with mappers (Module 09).</li>
+            <li><strong>$A00000–$A0FFFF — the Z80 area.</strong> The <span class="term" data-tip="Zilog Z80 at 3.58 MHz with its own 8 KB RAM; the Genesis's dedicated sound CPU, which the 68000 can pause and poke.">Z80 sound CPU</span>'s 8&nbsp;KB RAM and the sound chips appear here, in a window the 68000 can reach after requesting the Z80's bus.</li>
+            <li><strong>$A10000+ — I/O and control.</strong> The controller ports and a version register sit at $A10000; Z80 bus-request and reset are at $A11000; and — important later — the mapper/TIME registers at $A130xx and the <span class="term" data-tip="Trademark Security System: a lock on later consoles that requires the ROM to write 'SEGA' to $A14000. Module 08.">TMSS</span> register at $A14000.</li>
+            <li><strong>$C00000–$C0001F — the VDP.</strong> The <span class="term" data-tip="Video Display Processor (315-5313): the Genesis's graphics chip. The CPU talks to it through data and control ports in this range.">video chip</span>'s data &amp; control ports, the HV counter and the PSG live here.</li>
+            <li><strong>$FF0000–$FFFFFF — 68000 work RAM.</strong> The console's 64&nbsp;KB of read/write memory — the only big scratch pad the 68000 owns directly, and where all the game's running state lives.</li>
+          </ul>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A city with numbered addresses</span>
+            <p>
+              The 16&nbsp;MB space is one long street of numbered doors. Most of
+              the low-numbered blocks are the cartridge (a huge printed archive
+              you can only read); way up at the top of the street, $FF0000
+              onward, is the console's own house — small, but the only place it
+              can <em>write</em>. Scattered in between are a few special service
+              doors: knock at $C00000 and the video chip answers; knock at
+              $A10000 and you're talking to the controllers. The
+              <span class="term" data-tip="Logic that reads the high address bits and routes each access to the right device.">address decoder</span>
+              is the postal system that makes sure your knock reaches the right
+              door.
+            </p>
+          </div>
+
+          <h4>Mirroring: the same house at many numbers</h4>
+          <p>
+            One subtlety trips up newcomers. The work RAM is only 64&nbsp;KB, which
+            needs just 16 address bits to cover — but the region reserved for it
+            is far larger. The extra high address bits simply aren't decoded, so
+            the same 64&nbsp;KB of RAM appears to <em>repeat</em>, over and over,
+            across the whole upper range. This is
+            <span class="term" data-tip="When a device with few address lines appears repeated across a larger reserved region, because the high address bits aren't decoded. The Genesis's 64 KB RAM mirrors across $E00000–$FFFFFF.">mirroring</span>:
+            reading $FF0000 and $FF0000 minus 64&nbsp;KB hits the identical byte.
+            It isn't a bug — it's what naturally happens when you don't bother
+            decoding address lines you don't need, and emulators must reproduce
+            it faithfully because some code relies on it.
+          </p>
+          <p>
+            The lab is the whole map, live. Type an address or jump to a landmark,
+            and the region that would answer lights up with a plain-English note
+            on which device responds. Poke around the tiny I/O and VDP ranges
+            wedged between the giant ROM and RAM blocks, and land inside the RAM
+            mirror range to see the mirroring note.
+          </p>
+
+          <div class="lab" id="lab-memmap">
+            <div class="lab-head"><span class="dot"></span><span class="title">Memory-map explorer — who answers at this address?</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-sq" aria-label="A vertical map of the 68000's 16 MB address space with each device region; entering an address highlights the region that responds"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Address (hex)</label>
+                  <input class="hex-in" type="text" value="000100" maxlength="6" spellcheck="false" data-map-input aria-label="24-bit address">
+                </div>
+                <div class="ctrl">
+                  <label>Jump to</label>
+                  <div class="seg-btns wrap" role="group" aria-label="Address landmarks">
+                    <button data-map-goto="000000">ROM $000000</button>
+                    <button data-map-goto="A00000">Z80 $A00000</button>
+                    <button data-map-goto="A10000">I/O $A10000</button>
+                    <button data-map-goto="A14000">TMSS $A14000</button>
+                    <button data-map-goto="C00000">VDP $C00000</button>
+                    <button data-map-goto="FF0000">RAM $FF0000</button>
+                  </div>
+                </div>
+                <div class="readouts">
+                  <span class="readout">Region <b data-map-name>Cartridge ROM</b></span>
+                </div>
+                <span class="sim-note" data-map-dev>Hover the map or enter an address to see which device decodes it.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The 68000's flat 16 MB space is carved into device regions by the address decoder — the <strong>memory map</strong>.</li>
+              <li>Cartridge ROM sits at <strong>$000000</strong> (reset vectors first, so the CPU boots from the cart); work RAM is <strong>$FF0000–$FFFFFF</strong> (64 KB).</li>
+              <li>The Z80 area is at $A00000, I/O and control registers at $A10000+, and the VDP at $C00000.</li>
+              <li><strong>Mirroring</strong> makes the small RAM repeat across its reserved range, because unused high address bits aren't decoded.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#inside"><span class="dir">← Prev</span><span class="ttl">05 · Inside a cart</span></a>
+            <a class="next" href="#header"><span class="dir">Next →</span><span class="ttl">07 · The ROM header</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 07 --- -->
+      <section class="doc" id="header">
+        <div class="mod-head">
+          <span class="eye">Module 07 <span class="part-tag">· Part II</span></span>
+          <h3>The ROM header</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Decode the 256-byte header at $000100 that describes every Genesis game — its name, region, save memory, checksum and more — byte by byte.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Right after the reset vectors, every Genesis ROM carries a fixed
+            <strong>header</strong>: a 256-byte block, from <code>$000100</code>
+            to <code>$0001FF</code>, laid out to a standard format so that the
+            console — and, decades later, an emulator — can learn what the
+            cartridge is without running it. It is a little index card glued to
+            the front of the game, and it's remarkably human-readable: much of it
+            is plain ASCII text you can spot in a hex editor at a glance.
+          </p>
+          <p>
+            The header opens with the string the whole system hangs on:
+            <code>&quot;SEGA MEGA DRIVE &quot;</code> (or
+            <code>&quot;SEGA GENESIS&quot;</code> on some releases), sixteen bytes
+            at <code>$100</code>. Then a copyright and build-date field, the game's
+            title in both a domestic (Japanese) and an overseas form, a serial
+            number, a checksum, a code describing which controllers it supports,
+            the ROM and RAM address ranges from Module 06, an optional
+            <span class="term" data-tip="A field flagging battery-backed save memory, its type and its address range on the cartridge. Read in detail in Module 10.">SRAM descriptor</span>,
+            and finally a <span class="term" data-tip="A field listing which regions the game supports: J (Japan), U (Americas), E (Europe). Consulted by region-locking hardware — Module 08.">region field</span>.
+            Each field sits at a known offset, so reading the header is just
+            Module 01's game — fetch bytes at fixed addresses and interpret them.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The title page of a book</span>
+            <p>
+              Before the story starts, a book has a title page: title, author,
+              publisher, edition, ISBN, the country it's licensed for. You can
+              learn everything you need to shelve and catalogue the book without
+              reading a word of the actual text. The ROM header is that title
+              page. The console reads it to check the game is genuine and boots
+              it; a preservation database reads it to identify a dump; an emulator
+              reads it to size the ROM and set up saves — all before executing a
+              single instruction of the game.
+            </p>
+          </div>
+
+          <h4>The checksum, and why it's mostly ceremony</h4>
+          <p>
+            Two bytes at <code>$18E</code> hold a
+            <span class="term" data-tip="A 16-bit value formed by summing every word of the ROM from $000200 onward. A quick integrity check — but on real hardware most games never verify it.">checksum</span>:
+            a 16-bit sum of every word of the ROM from <code>$000200</code> to the
+            end. In principle it's an integrity check — recompute the sum, compare
+            it to the stored value, and a mismatch means a corrupt cartridge. In
+            practice most Genesis games never bother to verify it (a few famously
+            do), so a &ldquo;wrong&rdquo; checksum usually runs fine on hardware.
+            It matters more to <em>tooling</em>: ROM utilities recompute and
+            display it, and a handful of games and copy-protection tricks lean on
+            it, which is why emulators and fixers still compute it.
+          </p>
+          <p>
+            The lab is a live hex dump of a synthetic-but-structurally-real
+            header. Move your cursor over the bytes and each field lights up with
+            its name and a decoded explanation — find the <code>SEGA</code> tag,
+            the title, the region code, the SRAM descriptor and the checksum, and
+            watch the ASCII column on the right spell the text fields out.
+          </p>
+
+          <div class="lab" id="lab-header">
+            <div class="lab-head"><span class="dot"></span><span class="title">Header inspector — hover a byte, decode a field</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-sq" aria-label="A 256-byte hex dump of a Genesis ROM header with fields colour-coded; hovering a byte highlights its field and explains it"></canvas>
+              <div class="controls">
+                <div class="readouts">
+                  <span class="readout">Field <b data-hdr-name>$100 · Console name</b></span>
+                </div>
+                <span class="sim-note" data-hdr-dec>Hover the hex dump to inspect a field. This is a synthetic header — a fictional game, generated in your browser.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Every Genesis ROM has a standard 256-byte header at <strong>$000100–$0001FF</strong>, much of it human-readable ASCII.</li>
+              <li>It opens with <code>&quot;SEGA MEGA DRIVE &quot;</code>/<code>&quot;SEGA GENESIS&quot;</code> and describes title, serial, I/O support, ROM/RAM ranges, SRAM and region.</li>
+              <li>Reading the header is just fixed-offset byte reads — no need to run the game.</li>
+              <li>The 16-bit checksum at <strong>$18E</strong> sums the ROM from $200 on, but most games never verify it; it matters mainly to tools.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#memmap"><span class="dir">← Prev</span><span class="ttl">06 · The memory map</span></a>
+            <a class="next" href="#tmss"><span class="dir">Next →</span><span class="ttl">08 · TMSS &amp; region locking</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 08 --- -->
+      <section class="doc" id="tmss">
+        <div class="mod-head">
+          <span class="eye">Module 08 <span class="part-tag">· Part II</span></span>
+          <h3>TMSS &amp; region locking</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand the two gatekeepers a cartridge meets on later consoles: the TMSS &ldquo;write SEGA to a register&rdquo; check, and region locking by the header's region field.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The earliest Genesis consoles booted any cartridge that presented a
+            sane reset vector. Later revisions added a gate called
+            <strong>TMSS</strong> — the <em>Trademark Security System</em> — and
+            its mechanism is delightfully on-the-nose. When the console powers up,
+            its own small boot ROM checks that the cartridge's header contains the
+            <code>&quot;SEGA&quot;</code> string (Module 07), and then requires the
+            game itself to <strong>write the ASCII letters &lsquo;SEGA&rsquo; to a
+            hardware register at <code>$A14000</code></strong> early in start-up.
+            Only after that write does the console enable the VDP and let the game
+            display anything. Skip the write and the screen stays blank.
+          </p>
+          <p>
+            Why so theatrical? The clever part is legal, not technical. Writing
+            the letters &ldquo;SEGA&rdquo; and displaying the Sega trademark was
+            something an <em>unlicensed</em> manufacturer couldn't do without
+            reproducing Sega's trademark — turning a trivial technical check into
+            a <strong>trademark</strong> tripwire. It was less an unbreakable lock
+            and more a &ldquo;you must show our logo to boot, and if you do, we can
+            sue you for it&rdquo; trap. Technically it's just a register write; the
+            teeth were in court, not silicon.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Say the password, and the password is our brand name</span>
+            <p>
+              Imagine a members' club whose door only opens if you say a specific
+              word aloud — and the word happens to be the club's registered brand.
+              Anyone <em>can</em> say it, so it's a feeble lock; but saying it in
+              your own product means printing their brand in your product, and
+              <em>that</em> they can take you to court over. TMSS is exactly this:
+              the
+              <span class="term" data-tip="Trademark Security System: later Genesis consoles require the game to write 'SEGA' to $A14000 to enable video — a technical check whose real force was trademark law.">&lsquo;SEGA&rsquo; write to $A14000</span>
+              is easy to perform but hard to perform <em>legally</em> without a
+              licence.
+            </p>
+          </div>
+
+          <h4>Region locking: a separate gate</h4>
+          <p>
+            TMSS is about authenticity; <strong>region locking</strong> is about
+            geography, and it's a different mechanism. The console has a hardware
+            region (Japan / Americas / Europe), readable by software at the
+            version register in the $A10000 I/O range. Region enforcement can come
+            from two directions: some games check the console's region themselves
+            and refuse to run on a mismatch, and some consoles refuse cartridges
+            whose header <span class="term" data-tip="The header's region string (e.g. 'JUE'): which of Japan, USA and Europe a game declares support for.">region field</span>
+            doesn't include the console's region. There are also PAL/NTSC
+            differences underneath — a European console runs the 68000 slightly
+            slower (~7.60 vs 7.67&nbsp;MHz) and draws 240 lines instead of 224 — so
+            an out-of-region game might run too fast, too slow, or with a squashed
+            or bordered picture even when it boots. This is why the retro scene is
+            full of region-mod switches: they flip the console's reported region
+            and video standard.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 250" role="img" aria-label="Power-on flow: the boot ROM checks the header's SEGA string, the game writes SEGA to $A14000 to enable the VDP, and region checks compare the header and console region.">
+              <defs><marker id="ahT" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker></defs>
+              <rect x="40" y="90" width="150" height="70" rx="10" class="d-fill-panel d-stroke-line" stroke-width="1.5"/>
+              <text x="115" y="120" text-anchor="middle" class="d-label" style="font-size:13px">Power on</text>
+              <text x="115" y="140" text-anchor="middle" class="d-sub">boot ROM runs</text>
+              <line x1="190" y1="125" x2="232" y2="125" class="d-axis" stroke-width="1.6" marker-end="url(#ahT)"/>
+              <rect x="234" y="80" width="180" height="90" rx="10" class="d-fill-panel d-blue-s" stroke-width="1.5"/>
+              <text x="324" y="112" text-anchor="middle" class="d-label" style="font-size:13px">Check header</text>
+              <text x="324" y="132" text-anchor="middle" class="d-sub">"SEGA" at $100?</text>
+              <text x="324" y="150" text-anchor="middle" class="d-sub">region field vs console</text>
+              <line x1="414" y1="125" x2="456" y2="125" class="d-axis" stroke-width="1.6" marker-end="url(#ahT)"/>
+              <rect x="458" y="80" width="200" height="90" rx="10" class="d-fill-panel d-red-s" stroke-width="1.5"/>
+              <text x="558" y="108" text-anchor="middle" class="d-label" style="font-size:13px">Game writes</text>
+              <text x="558" y="128" text-anchor="middle" class="d-red" style="font-family:var(--mono);font-size:13px">'SEGA' → $A14000</text>
+              <text x="558" y="148" text-anchor="middle" class="d-sub">TMSS handshake</text>
+              <line x1="658" y1="125" x2="700" y2="125" class="d-axis" stroke-width="1.6" marker-end="url(#ahT)"/>
+              <rect x="702" y="90" width="160" height="70" rx="10" class="d-fill-panel d-good-s" stroke-width="1.5"/>
+              <text x="782" y="120" text-anchor="middle" class="d-label" style="font-size:13px">VDP enabled</text>
+              <text x="782" y="140" text-anchor="middle" class="d-good" style="font-family:var(--mono);font-size:11px">picture appears ✓</text>
+              <text x="40" y="40" class="d-tag">The TMSS boot gate (later consoles)</text>
+              <text x="234" y="210" class="d-sub">Fail the header or region check → console refuses; skip the $A14000 write → screen stays blank.</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Two gates, in sequence.</strong> The boot ROM checks the header's <span class="term" data-tip="'SEGA MEGA DRIVE'/'SEGA GENESIS' at $100.">SEGA string</span> and region; then the game must write <span class="term" data-tip="The literal ASCII letters 'SEGA' to the TMSS register.">'SEGA' to $A14000</span> to switch the video on. Both are easy to satisfy technically — their force was licensing and trademark law.</figcaption>
+          </figure>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li><strong>TMSS</strong> on later consoles requires the game to write the ASCII <code>&quot;SEGA&quot;</code> to <strong>$A14000</strong> to enable the VDP — no write, no picture.</li>
+              <li>It was really a <em>trademark</em> tripwire: technically trivial, legally sharp, aimed at unlicensed publishers.</li>
+              <li><strong>Region locking</strong> is separate: the console has a region (readable in the $A10000 range), and games and/or consoles can refuse a mismatch.</li>
+              <li>PAL vs NTSC also changes CPU speed (~7.60 vs 7.67 MHz) and line count (240 vs 224) — so out-of-region games can look or run wrong even when they boot.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#header"><span class="dir">← Prev</span><span class="ttl">07 · The ROM header</span></a>
+            <a class="next" href="#mappers"><span class="dir">Next →</span><span class="ttl">09 · Bank switching &amp; mappers</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 09 --- -->
+      <section class="doc" id="mappers">
+        <div class="mod-head">
+          <span class="eye">Module 09 <span class="part-tag">· Part II</span></span>
+          <h3>Bigger than 4 MB: bank switching &amp; mappers</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how a cartridge fits more ROM than the 68000's 4 MB window by paging banks into view — the Sega SRAM mapper and the SSF2 mapper.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Module 06 gave the cartridge a fixed 4&nbsp;MB window,
+            <code>$000000–$3FFFFF</code>. For most of the Genesis's life that was
+            plenty. But late, ambitious games — <em>Super Street Fighter II</em>
+            most famously — carried <strong>more</strong> ROM than 4&nbsp;MB, and
+            the 68000 simply has no address lines to reach it. You cannot make the
+            window bigger without a wider bus. So instead you make the ROM take
+            <em>turns</em> being visible through the window you have. That trick is
+            <span class="term" data-tip="Presenting different chunks (banks) of a large ROM through a fixed, smaller address window, one at a time, by writing a bank number to a mapper register.">bank switching</span>,
+            and the little chip on the cart that arranges it is a
+            <span class="term" data-tip="A chip on the cartridge that intercepts the CPU's accesses and redirects them to different physical ROM banks based on register writes.">mapper</span>.
+          </p>
+          <p>
+            The idea is exactly the paged version of Module 01. Divide the big
+            physical ROM into equal-sized <strong>banks</strong> — say 512&nbsp;KB
+            each. The 4&nbsp;MB window is divided into <strong>slots</strong> of
+            the same size. A set of <span class="term" data-tip="Small hardware registers on the mapper; writing a bank number to one makes that physical bank appear in the corresponding window slot.">mapper registers</span>
+            records, for each slot, which physical bank currently appears there.
+            When the CPU reads an address in a slot, the mapper looks up that
+            slot's bank number and fetches from the right chunk of the big ROM.
+            Want different data? Write a new bank number to the register, and the
+            bytes visible through that slot change instantly — no data is copied,
+            the mapper just re-points the window.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A small window onto a long mural</span>
+            <p>
+              You have an enormous mural but a narrow window to view it through.
+              You can't widen the window — but you <em>can</em> slide the mural
+              behind it. A
+              <span class="term" data-tip="A mapper register: writing to it slides a chosen slice of ROM behind the window.">mapper register</span>
+              is the crank that positions the mural: turn it and a different
+              panel fills the frame. The 68000 always looks at the same window
+              addresses; the mapper decides which slice of the 8&nbsp;MB mural is
+              behind it right now. Nothing moves in memory — only the choice of
+              what's shown.
+            </p>
+          </div>
+
+          <h4>Two real mappers</h4>
+          <ul>
+            <li><strong>The Sega SSF2 mapper.</strong> Used by <em>Super Street Fighter II</em> (a 5&nbsp;MB game), it divides the window into eight 512&nbsp;KB slots, with registers around <code>$A130F1–$A130FF</code> selecting which physical 512&nbsp;KB bank each slot shows. Slot 0 is left fixed to bank 0 so the reset vectors and header always stay put. This is the mapper the lab below models.</li>
+            <li><strong>The Sega SRAM mapper.</strong> A simpler, extremely common scheme centred on <code>$A130F1</code>: a single register that toggles between mapping cartridge <em>ROM</em> or the cartridge's battery-backed <em>SRAM</em> into a slice of the upper cartridge region. It's less about &ldquo;more ROM&rdquo; and more about &ldquo;let the save chip and the ROM share an address range,&rdquo; which is Module 10's business.</li>
+          </ul>
+          <p>
+            The lab is a bank-switching playground built on the SSF2 model. On the
+            left is an 8&nbsp;MB ROM as sixteen 512&nbsp;KB banks; on the right is
+            the CPU's 4&nbsp;MB window as eight slots. Pick a slot, choose a bank,
+            and &ldquo;write the register&rdquo; — watch the connection re-point and
+            the sweeping CPU-read cursor start returning bytes from a different
+            bank. Slot 0 stays locked to bank 0, because that's where the machine
+            starts every time.
+          </p>
+
+          <div class="lab" id="lab-bank">
+            <div class="lab-head"><span class="dot"></span><span class="title">Bank-switching playground — page ROM into the window</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-sq" aria-label="An 8 MB ROM as banks on the left and the CPU's 4 MB window as slots on the right, with lines showing which bank each slot maps to"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Edit slot</label>
+                  <div class="seg-btns wrap" role="group" aria-label="Window slot">
+                    <button data-bank-pick="0">0</button>
+                    <button class="on" data-bank-pick="1">1</button>
+                    <button data-bank-pick="2">2</button>
+                    <button data-bank-pick="3">3</button>
+                    <button data-bank-pick="4">4</button>
+                    <button data-bank-pick="5">5</button>
+                    <button data-bank-pick="6">6</button>
+                    <button data-bank-pick="7">7</button>
+                  </div>
+                </div>
+                <div class="ctrl">
+                  <label>Map bank — <span class="val" data-bank-target-val>bank 8</span></label>
+                  <input type="range" min="0" max="15" value="8" step="1" data-bank-target aria-label="Physical bank">
+                </div>
+                <button class="play-btn" data-bank-write>Write mapper register</button>
+                <button class="reset-btn" data-bank-reset>Reset to identity</button>
+                <div class="readouts">
+                  <span class="readout">Slot <b data-bank-slot>slot 1</b></span>
+                  <span class="readout">Register <b data-bank-reg>$A130F2 ← 8</b></span>
+                </div>
+                <span class="sim-note">Slot 0 is locked to bank 0 (it holds the reset vectors &amp; header). Illustrative of the SSF2 mapper at $A130F1–$A130FF.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The 68000's cartridge window is a fixed 4 MB; larger games can't widen it, so they <strong>page banks</strong> of a bigger ROM through it.</li>
+              <li>A <strong>mapper</strong> chip holds registers recording which physical bank appears in each window slot; writing a register re-points the view instantly.</li>
+              <li>The <strong>SSF2 mapper</strong> uses eight 512 KB slots via registers at $A130F1–$A130FF, keeping slot 0 fixed for the vectors.</li>
+              <li>The simpler <strong>Sega SRAM mapper</strong> ($A130F1) swaps ROM and battery SRAM into an address range — the bridge to Module 10.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#tmss"><span class="dir">← Prev</span><span class="ttl">08 · TMSS &amp; region locking</span></a>
+            <a class="next" href="#saves"><span class="dir">Next →</span><span class="ttl">10 · Battery saves</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 10 --- -->
+      <section class="doc" id="saves">
+        <div class="mod-head">
+          <span class="eye">Module 10 <span class="part-tag">· Part II</span></span>
+          <h3>Battery saves (SRAM / EEPROM)</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn how a read-only cartridge remembers your progress: a writable save chip on the board, kept alive by a battery or held in a serial EEPROM.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Here's a puzzle the whole course has been circling. The cartridge is
+            ROM — read-only, unchangeable. The console's RAM is writable but
+            forgets on power-off. So where does your <em>Phantasy Star</em> save
+            live, surviving weeks between play sessions? The answer is a third kind
+            of memory added to the board specifically for the job. The commonest is
+            <span class="term" data-tip="Static RAM: fast read/write memory that holds its contents as long as it has power. On a cartridge, a small coin battery supplies that power when the console is off.">battery-backed SRAM</span>:
+            a small static-RAM chip plus a coin-cell battery. While you play, the
+            console powers the SRAM and the game reads and writes it like any RAM;
+            when you switch off, the battery keeps just that chip alive, sipping a
+            trickle of current, so the bytes persist.
+          </p>
+          <p>
+            The SRAM lives in the cartridge's address range, and how it appears
+            varies. Often it sits in the upper part of the cartridge space (many
+            games map it around <code>$200000</code>), and on carts using the
+            <strong>Sega SRAM mapper</strong> from Module 09 it shares an address
+            region with ROM, toggled in and out by writing the mapper register at
+            <code>$A130F1</code> — write a 1 to expose the save memory, write a 0
+            to see ROM again. The header's SRAM descriptor (Module 07) is what tells
+            the console and the emulator that a save chip is present, where it lives,
+            and whether it uses only even bytes, only odd, or both.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A diary with its own tiny lamp</span>
+            <p>
+              The printed book (the ROM) can't be written in. The console's
+              notebook (RAM) gets wiped every night. So the cartridge carries a
+              diary with a tiny battery-powered lamp of its own: when the house
+              lights go out, the diary's own lamp stays lit just enough to keep the
+              ink from fading. Years later the entries are still there. When the
+              little
+              <span class="term" data-tip="The coin-cell battery on the cartridge board that powers the SRAM while the console is off. When it finally dies, saves stop persisting.">battery</span>
+              finally dies — and after thirty years many have — the diary goes
+              blank, which is exactly why old save-heavy carts &ldquo;forget&rdquo;
+              and need a battery replacement.
+            </p>
+          </div>
+
+          <h4>The other option: serial EEPROM</h4>
+          <p>
+            Some cartridges skip the battery entirely and use a small
+            <span class="term" data-tip="Electrically-Erasable Programmable ROM: non-volatile memory that keeps its contents with no power at all, written through a slow serial (I²C-style) protocol a few bits at a time.">serial EEPROM</span>
+            instead. An EEPROM is genuinely non-volatile — it keeps its data with
+            no power at all, so there's no battery to die — but it's written through
+            a slow serial protocol (an I²C-style clock-and-data line), a few bits at
+            a time, rather than being mapped as plain RAM. It typically holds far
+            less than an SRAM (a handful of bytes to a couple of kilobytes) and is
+            common in sports and puzzle games that only need to store a little.
+            Emulators have to recognise which scheme a game uses, because &ldquo;write
+            a byte to this address&rdquo; and &ldquo;clock these bits out on a serial
+            line&rdquo; are completely different jobs — a distinction Module 12
+            returns to.
+          </p>
+
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr><th>Property</th><th>Battery-backed SRAM</th><th>Serial EEPROM</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Keeps data via</td><td><span class="crc">coin battery</span></td><td><span class="crc">non-volatile cells</span></td></tr>
+                <tr><td>Battery to die?</td><td>yes — a real failure point</td><td>no battery at all</td></tr>
+                <tr><td>Seen by the CPU as</td><td>plain RAM in the cart range</td><td>a serial device (clock + data)</td></tr>
+                <tr><td>Typical size</td><td><span class="crc">2–64 KB</span></td><td><span class="crc">tens of bytes – ~2 KB</span></td></tr>
+                <tr><td>Write speed</td><td>fast (memory access)</td><td>slow (bit-by-bit serial)</td></tr>
+                <tr><td>Emulator save file</td><td><code>.srm</code> / <code>.sav</code></td><td><code>.eep</code> / <code>.srm</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Saves need writable, persistent memory — neither the ROM (read-only) nor the console RAM (volatile) can do it, so the cartridge adds a save chip.</li>
+              <li><strong>Battery-backed SRAM</strong> is read/written like normal RAM in the cartridge range, kept alive off-power by a coin cell that eventually dies.</li>
+              <li>Some carts use the <strong>Sega SRAM mapper</strong> ($A130F1) to swap SRAM and ROM into a shared address range; the header's SRAM descriptor declares it.</li>
+              <li><strong>Serial EEPROM</strong> is battery-free and non-volatile but small and slow, written bit-by-bit over an I²C-style line — a different beast for emulators to model.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#mappers"><span class="dir">← Prev</span><span class="ttl">09 · Bank switching &amp; mappers</span></a>
+            <a class="next" href="#lockon"><span class="dir">Next →</span><span class="ttl">11 · Lock-on &amp; the edge connector</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 11 --- -->
+      <section class="doc" id="lockon">
+        <div class="mod-head">
+          <span class="eye">Module 11 <span class="part-tag">· Part II</span></span>
+          <h3>Lock-on &amp; the edge connector</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand the Sonic &amp; Knuckles passthrough — how one cartridge stacks on another and merges their address spaces — and the expansion edge that fed the Mega-CD and 32X.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The most audacious cartridge Sega ever shipped was <em>Sonic &amp;
+            Knuckles</em> in 1994. Its case has a hinged flap on top hiding a
+            <em>second</em> cartridge slot, and Sega called the trick
+            <span class="term" data-tip="Lock-on technology: Sonic & Knuckles' passthrough slot lets a second cartridge plug in on top, and the S&K hardware merges the two into the 68000's address space.">lock-on technology</span>.
+            Plug another Genesis game into that top slot and the two carts combine.
+            It works because, as Module 05 taught, the edge connector is just the
+            68000's bus — so S&amp;K's board can pass that bus straight through to
+            the cartridge above it, while its own mapper hardware decides how the
+            two ROMs share the address space below.
+          </p>
+          <p>
+            What you get depends on which game sits on top, and S&amp;K's hardware
+            has three documented behaviours (the exact mappings below are
+            illustrative):
+          </p>
+          <ul>
+            <li><strong>Lock on <em>Sonic 3</em></strong> and the two fuse into <strong>Sonic 3 &amp; Knuckles</strong>: Sonic 3's ROM maps low at <code>$000000</code>, S&amp;K's own ROM sits above it, and the combined 4&nbsp;MB behaves as one enormous game that neither cart could hold alone. This was the intended headline act — the two halves of a game split across two release dates.</li>
+            <li><strong>Lock on <em>Sonic 2</em></strong> and you get <strong>Knuckles in Sonic 2</strong>: S&amp;K overlays its Knuckles character and controls onto Sonic 2 using its own code plus a small patch region.</li>
+            <li><strong>Lock on almost anything else</strong> and S&amp;K notices it doesn't recognise the cart and unlocks a hidden bonus — the <strong>&ldquo;No Way?&rdquo; Blue Sphere</strong> game — feeding the other cartridge's bytes in as level-generation data, so a different top cart literally makes different levels.</li>
+          </ul>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A base extension that reads whatever you clip on</span>
+            <p>
+              Think of Sonic &amp; Knuckles as a docking base that passes power and
+              signal through to whatever module you clip on top. If it recognises
+              the module (Sonic 3), the two act as one designed-together device. If
+              it half-recognises it (Sonic 2), it patches in a new feature. And if
+              it doesn't recognise it at all, it doesn't give up — it treats the
+              stranger's contents as raw
+              <span class="term" data-tip="In Blue Sphere mode, the locked-on cartridge's ROM bytes are read as a seed for procedurally generating bonus-stage layouts.">seed data</span>
+              and generates a puzzle from them. One passthrough slot, three
+              personalities.
+            </p>
+          </div>
+
+          <p>
+            The lab makes S&amp;K the base cartridge and lets you clip different
+            games onto its passthrough. Choose the top cart and watch the combined
+            68000 address map redraw — which ROM lands at <code>$000000</code>,
+            where S&amp;K's own ROM goes, and what game the combination boots as.
+          </p>
+
+          <div class="lab" id="lab-lockon">
+            <div class="lab-head"><span class="dot"></span><span class="title">Lock-on simulator — stack a cart, merge the address space</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-sq" aria-label="Sonic and Knuckles as a base cartridge with a passthrough slot; choosing a top cartridge redraws the combined 68000 address map"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Cartridge on the passthrough</label>
+                  <div class="seg-btns wrap" role="group" aria-label="Locked-on cartridge">
+                    <button class="on" data-lock-mode="none">nothing</button>
+                    <button data-lock-mode="s3">Sonic 3</button>
+                    <button data-lock-mode="s2">Sonic 2</button>
+                    <button data-lock-mode="other">other game</button>
+                  </div>
+                </div>
+                <div class="readouts">
+                  <span class="readout">Boots as <b data-lock-title>Sonic &amp; Knuckles</b></span>
+                </div>
+                <span class="sim-note" data-lock-note>Choose a cartridge to lock on and watch the combined address map. Mappings are illustrative of documented lock-on behaviour.</span>
+              </div>
+            </div>
+          </div>
+
+          <h4>The other expansion edge: Mega-CD &amp; 32X</h4>
+          <p>
+            The cartridge slot wasn't the console's only bus door. The Genesis also
+            exposed an <strong>expansion connector</strong> that gave add-ons direct
+            access to the same 68000 bus, and two famous ones used it. The
+            <span class="term" data-tip="Sega's CD-ROM add-on: it clips underneath the console and adds its own 68000, RAM and CD drive, appearing in the reserved part of the address map.">Mega-CD (Sega CD)</span>
+            bolted on underneath, bringing a whole second 68000, more RAM and a
+            CD-ROM drive, and claimed a slice of the reserved <code>$400000</code>-ish
+            region. The <span class="term" data-tip="Sega's 32-bit add-on: a mushroom-shaped unit in the cartridge slot with two SH-2 CPUs and its own video, layered on top of the Genesis's output.">32X</span>
+            plugged into the cartridge slot itself, adding two 32-bit SH-2 processors
+            and its own video hardware, and mapped its resources into the upper
+            cartridge/expansion space. Both are proof of the same principle you've
+            followed all course: on the Genesis, everything — a game, a save chip, a
+            passthrough cart, an entire CD-ROM subsystem — ultimately appears as
+            regions on one shared 68000 bus.
+          </p>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li><strong>Lock-on</strong> works because the cartridge edge is the 68000 bus: Sonic &amp; Knuckles passes it through to a second, stacked cartridge and merges the two ROMs into the address space.</li>
+              <li>Sonic 3 fuses into <strong>Sonic 3 &amp; Knuckles</strong>; Sonic 2 becomes <strong>Knuckles in Sonic 2</strong>; other carts unlock the procedural <strong>Blue Sphere</strong>.</li>
+              <li>A separate <strong>expansion connector</strong> exposed the same bus to the <strong>Mega-CD</strong> and, via the cartridge slot, the <strong>32X</strong>.</li>
+              <li>Everything on the Genesis — carts, saves, add-ons — resolves to regions on one shared 68000 bus.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#saves"><span class="dir">← Prev</span><span class="ttl">10 · Battery saves</span></a>
+            <a class="next" href="#loading"><span class="dir">Next → Part III</span><span class="ttl">12 · Loading a ROM</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART III ============ -->
+      <section class="part" id="part-3">
+        <div class="part-inner">
+          <div class="kicker">Part III</div>
+          <h3>Emulating the cartridge</h3>
+          <p>
+            Finally: how does software on your PC stand in for a chip full of
+            frozen bits? A cartridge is the <em>easiest</em> part of a console to
+            emulate — it's just memory — but &ldquo;just load the file&rdquo; hides
+            real decisions: detecting the header, figuring out whether a game needs
+            a mapper or a save chip, and where the save file goes. These two
+            modules ground the whole course in the open-source emulators
+            <strong>Genesis Plus GX</strong> and <strong>BlastEm</strong>, and turn
+            everything you've learned into files and settings you can actually
+            click.
+          </p>
+          <div class="part-meta"><span>Modules <b>12–13</b></span><span>Difficulty <b>Emulation</b></span><span>Labs <b>reference</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 12 --- -->
+      <section class="doc" id="loading">
+        <div class="mod-head">
+          <span class="eye">Module 12 <span class="part-tag">· Part III</span></span>
+          <h3>Loading a ROM</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Follow a Genesis emulator as it opens a ROM file: what .bin/.md are, how it reads the header, detects a mapper, and wires up the SRAM save file.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            To an emulator, a cartridge <em>is</em> its ROM dump: a plain file that
+            is a byte-for-byte copy of the mask ROM's contents, starting at the
+            reset vectors, then the header, then the code and data. You'll see two
+            common extensions. A <code>.bin</code> (or <code>.gen</code>) file is
+            the straightforward dump in the 68000's natural
+            <span class="term" data-tip="Byte order matching the 68000: most-significant byte first. A .bin dump reads correctly on a big-endian machine — Module 04.">big-endian</span>
+            order. A <code>.md</code> file is a historical oddity from one family
+            of dumpers that stored the ROM <em>byte-swapped</em> (interleaved), so
+            loaders detect and de-interleave it. Both are covered by the
+            endianness lesson of Module 04 — and a byte-swapped ROM is exactly the
+            <code>ESAG</code>-instead-of-<code>SEGA</code> symptom you saw there.
+          </p>
+
+          <h4>Step one: read the header</h4>
+          <p>
+            The first thing an emulator like <strong>Genesis Plus GX</strong> or
+            <strong>BlastEm</strong> does is check offset <code>$100</code> for the
+            <code>&quot;SEGA&quot;</code> string (Module 07). Finding it confirms the
+            byte order is right (if it sees the swapped form, it de-interleaves and
+            tries again) and unlocks the rest of the header: the title for the UI,
+            the region field to pick a default video standard, the ROM/RAM ranges,
+            and the SRAM descriptor. All of this is Module 01's read-a-byte-at-a-
+            fixed-offset, done in software over the file instead of over silicon.
+          </p>
+
+          <h4>Step two: detect the mapper and the save</h4>
+          <p>
+            Next the emulator decides how the cartridge behaves. If the ROM is
+            larger than 4&nbsp;MB, or its serial/known-database entry matches a
+            game that uses one, it enables the right
+            <span class="term" data-tip="The emulator's model of the cartridge's bank-switching hardware — e.g. the SSF2 mapper's $A130F1–$A130FF registers from Module 09.">mapper</span>
+            — the SSF2 registers at <code>$A130F1–$A130FF</code>, the Sega SRAM
+            mapper, or one of the unofficial mappers used by certain unlicensed
+            carts. It also reads the SRAM descriptor (or matches a known game) to
+            decide whether to allocate battery-backed SRAM or an EEPROM, and where
+            in the address map to place it. Because a few carts declare this
+            incorrectly or use quirky hardware, accurate emulators keep an internal
+            database keyed on the game's checksum and serial to override the header
+            when needed — the reason those Module 07 fields matter to tooling.
+          </p>
+
+          <h4>Step three: the save file</h4>
+          <p>
+            When the game writes to its save memory, the emulator captures those
+            bytes and, on exit, writes them to a companion file next to the ROM —
+            conventionally <code>.srm</code> for SRAM saves (and formats like
+            <code>.eep</code> for EEPROM). Load the ROM again and the emulator reads
+            that file back into the emulated save chip, so your progress persists
+            exactly as the coin-cell battery did on real hardware (Module 10) —
+            except it never runs out. Back up the <code>.srm</code> and you've done
+            what a battery replacement does on a real cart, without a soldering iron.
+          </p>
+
+          <div class="pipe">
+            <div class="stage"><div class="t">Open file</div><div class="d">.bin/.md; de-swap if needed <span style="color:var(--muted)">(04)</span></div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">Read header</div><div class="d">"SEGA", title, region, SRAM <span style="color:var(--muted)">(07)</span></div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">Detect mapper</div><div class="d">&gt;4 MB? SSF2 / SRAM mapper <span style="color:var(--muted)">(09)</span></div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">Wire saves</div><div class="d">alloc SRAM/EEPROM, load .srm <span style="color:var(--muted)">(10)</span></div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">Map &amp; run</div><div class="d">ROM at $000000, boot the 68000 <span style="color:var(--muted)">(06)</span></div></div>
+          </div>
+
+          <div class="note hw">
+            <div class="ico">✦</div>
+            <div><p><strong>Grounded in real code.</strong> Genesis Plus GX keeps a
+            cartridge-hardware layer that recognises the standard mappers and a
+            long list of per-game save and mapper quirks; BlastEm leans on ROM
+            detection plus a configuration database for the same job. Neither
+            invents behaviour — they reproduce the header, mapper registers and
+            save hardware this course has walked through.</p></div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A ROM file (<code>.bin</code>/<code>.gen</code>, big-endian; <code>.md</code>, byte-swapped) is a literal copy of the cartridge's mask ROM.</li>
+              <li>Loaders check <code>&quot;SEGA&quot;</code> at $100 to confirm byte order and read title, region, ROM/RAM ranges and the SRAM descriptor.</li>
+              <li>They detect the mapper (size &gt; 4 MB → SSF2/SRAM mapper) and the save type, often overriding the header from a checksum/serial database.</li>
+              <li>Save memory is mirrored to a companion file (<code>.srm</code>/<code>.eep</code>) that persists forever — a battery that never dies.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#lockon"><span class="dir">← Prev · Part II</span><span class="ttl">11 · Lock-on &amp; the edge connector</span></a>
+            <a class="next" href="#try"><span class="dir">Next →</span><span class="ttl">13 · Try it in an emulator</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 13 --- -->
+      <section class="doc" id="try">
+        <div class="mod-head">
+          <span class="eye">Module 13 <span class="part-tag">· Part III</span></span>
+          <h3>Try it in an emulator</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Turn the whole course into things you can click in Genesis Plus GX or BlastEm — and trace one byte's full journey from silicon to screen, one last time.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            You now know what a Genesis cartridge <em>is</em>, so let's put the
+            knowledge to work. (Menu wording differs between emulators and
+            versions; everything below is described by <em>function</em>, so you
+            can find it whatever it's called.)
+          </p>
+          <ul>
+            <li><strong>Open a ROM.</strong> Point the emulator at a <code>.bin</code>/<code>.md</code>/<code>.gen</code> dump of a cartridge you own. The title, region and any warnings it shows come straight from Module 07's header, parsed live as Module 12 described.</li>
+            <li><strong>Watch the region default.</strong> Emulators pick NTSC or PAL from the header's region field (Module 08) — and let you override it. Force the &ldquo;wrong&rdquo; one and you'll see exactly the speed and picture-size effects that module warned about.</li>
+            <li><strong>Find the save file.</strong> After you save in-game and quit, look for a <code>.srm</code> next to the ROM — that's your battery-backed SRAM (Module 10), captured to disk. Delete it and your save is gone, just like a dead coin cell.</li>
+            <li><strong>Try a big game.</strong> Load a &gt;4 MB game like <em>Super Street Fighter II</em> and know that behind the scenes the emulator is servicing the SSF2 mapper's bank registers (Module 09) on every write to $A130Fx.</li>
+            <li><strong>Stack a lock-on.</strong> Good emulators let you specify Sonic &amp; Knuckles <em>plus</em> a second ROM to reproduce lock-on (Module 11) — try it with Sonic 3, then with something random to unlock Blue Sphere.</li>
+            <li><strong>Open the debugger.</strong> BlastEm ships a capable debugger and Genesis Plus GX forks expose RAM/VRAM views — poke around $FF0000 work RAM and $C00000 VDP ports (Module 06) and watch the map you learned come alive.</li>
+          </ul>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A perfect facsimile of the book</span>
+            <p>
+              Emulating a cartridge isn't restoring a machine so much as reprinting
+              a book: because the cartridge is <em>only</em> memory, a faithful copy
+              of its bytes plus the handful of rules for mappers and saves
+              reproduces it completely. There is no laser to model, no motor to
+              time — the whole cartridge is data and a few register behaviours. That
+              is why Genesis emulation matured early and runs on almost anything:
+              the hard parts of the console are the CPU, video and sound; the
+              cartridge, the thing you've spent twelve modules on, is the part that
+              hands itself over most willingly.
+            </p>
+          </div>
+
+          <h4>The whole journey, one last time</h4>
+          <p>
+            Here is the entire course as a single chain — worth tracing with your
+            finger, because every link is now a module you've done:
+          </p>
+          <div class="pipe">
+            <div class="stage"><div class="t">Bit</div><div class="d">a cell in mask ROM <span style="color:var(--muted)">(01)</span></div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">Address</div><div class="d">bus + /CS/OE fetch a byte <span style="color:var(--muted)">(02–03)</span></div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">Map</div><div class="d">ROM at $000000, mappers <span style="color:var(--muted)">(06, 09)</span></div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">Header</div><div class="d">who this game is <span style="color:var(--muted)">(07)</span></div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">Emulator</div><div class="d">a file + a few rules <span style="color:var(--muted)">(12)</span></div></div>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 210" role="img" aria-label="The full journey: a bit in mask ROM, fetched over the bus, placed in the memory map, described by the header, and reproduced by an emulator as a file plus mapper and save rules.">
+              <defs><marker id="ahE" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker></defs>
+              <rect x="30"  y="60" width="130" height="64" rx="10" class="d-fill-panel d-blue-s" stroke-width="1.5"/>
+              <text x="95" y="87" text-anchor="middle" class="d-label" style="font-size:13px">bit in ROM</text>
+              <text x="95" y="106" text-anchor="middle" class="d-sub">mask silicon</text>
+              <line x1="160" y1="92" x2="192" y2="92" class="d-axis" stroke-width="1.8" marker-end="url(#ahE)"/>
+              <rect x="194" y="60" width="130" height="64" rx="10" class="d-fill-panel d-red-s" stroke-width="1.5"/>
+              <text x="259" y="87" text-anchor="middle" class="d-label" style="font-size:13px">bus fetch</text>
+              <text x="259" y="106" text-anchor="middle" class="d-sub">addr + /CS/OE</text>
+              <line x1="324" y1="92" x2="356" y2="92" class="d-axis" stroke-width="1.8" marker-end="url(#ahE)"/>
+              <rect x="358" y="60" width="130" height="64" rx="10" class="d-fill-panel d-gold-s" stroke-width="1.5"/>
+              <text x="423" y="87" text-anchor="middle" class="d-label" style="font-size:13px">memory map</text>
+              <text x="423" y="106" text-anchor="middle" class="d-sub">$000000 · mappers</text>
+              <line x1="488" y1="92" x2="520" y2="92" class="d-axis" stroke-width="1.8" marker-end="url(#ahE)"/>
+              <rect x="522" y="60" width="130" height="64" rx="10" class="d-fill-panel d-amber-s" stroke-width="1.5"/>
+              <text x="587" y="87" text-anchor="middle" class="d-label" style="font-size:13px">header</text>
+              <text x="587" y="106" text-anchor="middle" class="d-sub">name · region · save</text>
+              <line x1="652" y1="92" x2="684" y2="92" class="d-axis" stroke-width="1.8" marker-end="url(#ahE)"/>
+              <rect x="686" y="60" width="130" height="64" rx="10" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="751" y="87" text-anchor="middle" class="d-label" style="font-size:13px">emulator</text>
+              <text x="751" y="106" text-anchor="middle" class="d-sub">file + rules</text>
+              <path d="M30 150 H488" fill="none" stroke="#ff5347" stroke-width="1.6"/>
+              <path d="M30 150 V140 M488 150 V140" fill="none" stroke="#ff5347" stroke-width="1.6"/>
+              <text x="259" y="174" text-anchor="middle" class="d-sub d-red">real cartridge: silicon on the 68000 bus (01–11)</text>
+              <path d="M522 150 H816" fill="none" stroke="#3fb5ff" stroke-width="1.6"/>
+              <path d="M522 150 V140 M816 150 V140" fill="none" stroke="#3fb5ff" stroke-width="1.6"/>
+              <text x="669" y="174" text-anchor="middle" class="d-sub d-blue">in an emulator: a dump + mapper &amp; save rules (12)</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Bit → bus → map → header → emulator.</strong> On real hardware every byte a Genesis game touched made the left-hand trip through silicon and the 68000 bus. An emulator reproduces the whole cartridge as a file plus a few mapper and save rules — and because a cartridge is <em>only</em> memory, that's enough. That's the entire course in one sentence.</figcaption>
+          </figure>
+
+          <div class="takeaway">
+            <div class="th">Course complete ✦</div>
+            <ul>
+              <li>You can narrate a byte's full journey: bit in mask ROM → bus fetch (/CS, /OE) → memory map → header → emulator.</li>
+              <li>You know why the cartridge boots instantly, why the 68000 is big-endian, and how mappers break the 4 MB ceiling.</li>
+              <li>You understand TMSS, region locks, battery saves and the Sonic &amp; Knuckles lock-on — and where each lives in the address map.</li>
+              <li>You can open a ROM in Genesis Plus GX or BlastEm and explain every step it takes to become a running cartridge.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#loading"><span class="dir">← Prev</span><span class="ttl">12 · Loading a ROM</span></a>
+            <a class="next" href="#rom"><span class="dir">↺ Restart</span><span class="ttl">01 · What a ROM is</span></a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <p>
+          An interactive course built in the spirit of the Genesis Plus GX,
+          BlastEm and Nuked-OPN2 preservation projects. Every ROM, header,
+          bus cycle and memory map on this page is a synthetic simulation drawn
+          on the fly with the Canvas API to illustrate a concept. This page
+          contains <strong>no game data and no copyrighted material</strong>;
+          the header, ROM contents and lock-on mappings shown are fictional and
+          generated in your browser. Hardware behaviour is grounded in the
+          open-source emulators and published reverse-engineering of the Sega
+          Genesis / Mega Drive; where an exact figure varies by model or source
+          (bus timings, mapper register details, lock-on mappings), the text
+          says so and stays conservative.
+        </p>
+        <p class="src">
+          Grounded in · <code>Genesis Plus GX</code> · <code>BlastEm</code> ·
+          <code>Nuked-OPN2</code> — Sega, Genesis and Mega Drive are trademarks
+          of Sega; this is an independent, non-commercial project.
+        </p>
+      </footer>
+
+    </div><!-- /wrap -->
+  </main>
+</div><!-- /app -->
+
+<script src="app.js"></script>
+</body>
+</html>
