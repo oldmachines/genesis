@@ -1,0 +1,2130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Genesis CPU — the 68000, the Z80 &amp; emulation</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%23ff5347%27/%3E%3Crect x=%276%27 y=%278%27 width=%2720%27 height=%275%27 rx=%272%27 fill=%27%230a0b10%27/%3E%3C/svg%3E">
+<meta name="description" content="A hands-on course in three parts: how a CPU works from absolute zero, the Genesis' two brains — the Motorola 68000 and its Z80 sound sidekick, the bus that makes them share memory — and how Genesis Plus GX and BlastEm run both processors in lockstep. Every module has an interactive lab you can run in your browser.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="progress" aria-hidden="true"><div class="fill" id="progress-fill"></div></div>
+<button class="menu-btn" id="menu-btn" aria-label="Open contents">☰</button>
+<div class="scrim" id="scrim"></div>
+
+<div class="app">
+
+  <!-- ================================================= SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Genesis CPU</h1>
+        <span class="sub">A course · 15 modules</span>
+      </div>
+    </div>
+
+    <nav class="toc" aria-label="Course contents">
+      <div class="toc-group">Part I · How CPUs work</div>
+      <a href="#loop"><span class="n">01</span><span>The fetch–decode–execute loop</span></a>
+      <a href="#registers"><span class="n">02</span><span>Registers, memory &amp; the ISA</span></a>
+      <a href="#binary"><span class="n">03</span><span>Numbers in binary</span></a>
+      <a href="#branches"><span class="n">04</span><span>Branches, the stack &amp; subroutines</span></a>
+      <a href="#interrupts"><span class="n">05</span><span>Interrupts &amp; exceptions</span></a>
+
+      <div class="toc-group">Part II · The Genesis' two brains</div>
+      <a href="#m68k"><span class="n">06</span><span>Meet the Motorola 68000</span></a>
+      <a href="#addressing"><span class="n">07</span><span>Registers &amp; addressing modes</span></a>
+      <a href="#isa68k"><span class="n">08</span><span>The instruction set in practice</span></a>
+      <a href="#z80"><span class="n">09</span><span>The Z80 sound CPU</span></a>
+      <a href="#bus"><span class="n">10</span><span>Sharing the bus</span></a>
+      <a href="#memmap"><span class="n">11</span><span>The memory map</span></a>
+      <a href="#gen-int"><span class="n">12</span><span>Interrupts on the Genesis</span></a>
+
+      <div class="toc-group">Part III · Emulation</div>
+      <a href="#emu"><span class="n">13</span><span>Interpreters vs recompilers</span></a>
+      <a href="#accuracy"><span class="n">14</span><span>Timing &amp; the accuracy traps</span></a>
+      <a href="#try"><span class="n">15</span><span>Try it in an emulator</span></a>
+
+      <div class="progress-note">Progress · <b id="pct">0%</b></div>
+    </nav>
+  </aside>
+
+  <!-- ================================================= MAIN =============== -->
+  <main class="main">
+
+    <!-- ------------------------------------------------ HERO -------------- -->
+    <header class="hero">
+      <canvas id="hero-pipe" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <div class="inner">
+          <span class="eyebrow">An interactive course · Genesis Plus GX &amp; BlastEm</span>
+          <h2>How the <span class="grad">Genesis</span> thought.</h2>
+          <p class="lede">
+            We start from the very beginning — what a processor even
+            <em>is</em> — assuming you know nothing about computer architecture.
+            Once the vocabulary is solid, we meet the console's two brains: the
+            <strong>Motorola 68000</strong> that runs the game and the
+            <strong>Zilog Z80</strong> that drives the sound, the bus that forces
+            them to share memory, and finally how emulators reproduce both at
+            once. Fifteen modules, each with a <strong>live, clickable
+            machine</strong> — including a real, tiny 68000 assembler you can
+            step. No game code ships with this page; every simulation is built
+            in your browser.
+          </p>
+          <div class="cta-row">
+            <a class="btn primary" href="#loop">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Begin Part I
+            </a>
+            <a class="btn" href="#lab-asm">Assemble some 68000</a>
+          </div>
+
+          <div class="arc-cards">
+            <a class="arc" href="#part-1">
+              <div class="an">PART I</div>
+              <h4>How CPUs work</h4>
+              <p>Instructions, registers, binary and two's complement, branches and the stack, interrupts — the universal vocabulary of processors, explained from zero.</p>
+              <div class="cnt">5 modules · with labs</div>
+            </a>
+            <a class="arc" href="#part-2">
+              <div class="an">PART II</div>
+              <h4>The two brains</h4>
+              <p>The Motorola 68000, its addressing modes and instruction set, the Z80 sound CPU, the shared bus and its arbitration, the 24-bit memory map, and the console's interrupts.</p>
+              <div class="cnt">7 modules · with labs</div>
+            </a>
+            <a class="arc" href="#part-3">
+              <div class="an">PART III</div>
+              <h4>Emulation</h4>
+              <p>Interpreters vs recompilers, keeping two CPUs and a video chip in step, the timing traps that make accuracy hard, and the settings that map to it all.</p>
+              <div class="cnt">3 modules · with labs</div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+
+      <!-- ============================================ PART I ============== -->
+      <section class="part" id="part-1">
+        <div class="part-inner">
+          <div class="kicker">Part I</div>
+          <h3>How CPUs work</h3>
+          <p>
+            This first part is pure fundamentals — nothing about any specific
+            console or chip yet. It's the toolkit <em>every</em> processor is
+            built from, whether that's your phone, your laptop, or the two chips
+            we'll meet in Part II. We build the vocabulary one word at a time —
+            instruction, register, binary, branch, stack, interrupt — and you
+            can step and run each idea in a tiny simulated machine. If a term is
+            ever used before it's explained, that's a bug; tell us. Everything
+            in Parts II and III is just these five ideas wired together.
+          </p>
+          <div class="part-meta"><span>Modules <b>01–05</b></span><span>Difficulty <b>Absolute beginner</b></span><span>Labs <b>2 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 01 --- -->
+      <section class="doc" id="loop">
+        <div class="mod-head">
+          <span class="eye">Module 01 <span class="part-tag">· Part I</span></span>
+          <h3>The fetch–decode–execute loop</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand, from scratch, what a processor actually does: fetch a number from memory, work out what it means, do it — forever.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Let's start with what a processor physically is. Strip away the
+            marketing and a CPU is a machine that repeats one tiny ritual,
+            millions of times per second, without ever getting bored. The ritual
+            has three steps: <strong>fetch</strong> a number from memory,
+            <strong>decode</strong> it — work out what command that number stands
+            for — and <strong>execute</strong> it. Then do the next one. That's
+            the whole job. Every game the Genesis ever ran — every Sonic loop,
+            every Streets of Rage punch, every pixel — is that loop, running
+            fast.
+          </p>
+          <p>
+            Two words in that ritual need unpacking. <strong>Memory</strong> is
+            a long row of numbered pigeonholes, each holding one small number (a
+            <span class="term" data-tip="Eight bits — the smallest chunk of memory a CPU normally addresses. One byte holds a number from 0 to 255.">byte</span>).
+            The pigeonhole's position in the row is its
+            <strong>address</strong> — cell 0, cell 1, cell 2, and so on. And an
+            <strong>instruction</strong> is just one of those stored numbers that
+            the CPU has agreed to treat as a command. There is nothing special
+            about the number itself: <code>0x1E</code> sitting in memory might
+            mean &ldquo;load from cell 14&rdquo; to the processor, or it might
+            just be the number 30 in someone's data. Position and convention
+            decide, nothing else. Programs and data live in the same memory, side
+            by side — the single most important idea in all of computing, and (in
+            Module 14) it's also what makes emulators sweat.
+          </p>
+          <p>
+            So how does the CPU know <em>which</em> cell holds its next command?
+            It keeps a bookmark: a small counter called the <strong>program
+            counter</strong> (<span class="term" data-tip="The register holding the memory address of the next instruction to run. On the 68000 it is a full 24-bit address; it normally steps forward, and a branch rewrites it.">PC</span>).
+            Each trip round the loop it fetches the instruction the PC points at,
+            then normally bumps the PC forward so the next trip fetches the next
+            one. The exception is a <strong>branch</strong> (a &ldquo;jump&rdquo;):
+            an instruction whose entire job is to overwrite the PC with a new
+            address, so execution leaps somewhere else. Branches are how programs
+            make decisions and loops — Module 04 is all about them.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A cook with recipe cards</span>
+            <p>
+              Picture a cook working from a stack of numbered recipe cards, one
+              short command per card: &ldquo;fetch the flour&rdquo;, &ldquo;add
+              two eggs&rdquo;, &ldquo;go back to card 3&rdquo;. The cook keeps a
+              finger on the current card — that finger is the
+              <span class="term" data-tip="The register holding the address of the next instruction — the CPU's bookmark into memory.">program counter</span>.
+              Read a card, do what it says, slide the finger to the next card.
+              The cook never sees the &ldquo;whole recipe&rdquo;; only ever one
+              card at a time. A CPU is exactly this cook — just one who reads
+              millions of cards a second and never misreads one.
+            </p>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 300" role="img" aria-label="The fetch, decode, execute cycle reading instructions from memory">
+              <defs><marker id="m1a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker><marker id="m1c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#3fb5ff"/></marker></defs>
+              <rect x="40" y="40" width="180" height="220" rx="10" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="130" y="30" text-anchor="middle" class="d-tag">Memory</text>
+              <rect x="56" y="56"  width="148" height="30" rx="5" class="d-cell"/><text x="70" y="76" class="d-num">0 · 0x1E</text><text x="196" y="76" text-anchor="end" class="d-sub">load</text>
+              <rect x="56" y="92"  width="148" height="30" rx="5" class="d-fill-panel d-violet-s" stroke-width="1.4"/><text x="70" y="112" class="d-num">1 · 0x2D</text><text x="196" y="112" text-anchor="end" class="d-sub">add</text>
+              <rect x="56" y="128" width="148" height="30" rx="5" class="d-cell"/><text x="70" y="148" class="d-num">2 · 0x3E</text><text x="196" y="148" text-anchor="end" class="d-sub">store</text>
+              <rect x="56" y="164" width="148" height="30" rx="5" class="d-cell"/><text x="70" y="184" class="d-num">3 · 0x40</text><text x="196" y="184" text-anchor="end" class="d-sub">jump</text>
+              <rect x="56" y="200" width="148" height="30" rx="5" class="d-cell"/><text x="70" y="220" class="d-num">…</text><text x="196" y="220" text-anchor="end" class="d-sub">data</text>
+              <rect x="40" y="272" width="180" height="20" rx="5" class="d-fill-panel d-violet-s" stroke-width="1.2"/>
+              <text x="130" y="286" text-anchor="middle" class="d-sub d-violet">PC = 1  (the bookmark)</text>
+              <rect x="330" y="46" width="190" height="64" rx="10" class="d-fill-panel2 d-cyan-s" stroke-width="1.5"/>
+              <text x="425" y="74" text-anchor="middle" class="d-label" style="font-size:14px">1 · Fetch</text>
+              <text x="425" y="94" text-anchor="middle" class="d-sub">read the cell PC points at</text>
+              <rect x="620" y="46" width="190" height="64" rx="10" class="d-fill-panel2 d-violet-s" stroke-width="1.5"/>
+              <text x="715" y="74" text-anchor="middle" class="d-label" style="font-size:14px">2 · Decode</text>
+              <text x="715" y="94" text-anchor="middle" class="d-sub">0x2D → &ldquo;add cell 13&rdquo;</text>
+              <rect x="475" y="190" width="190" height="64" rx="10" class="d-fill-panel2 d-amber-s" stroke-width="1.5"/>
+              <text x="570" y="218" text-anchor="middle" class="d-label" style="font-size:14px">3 · Execute</text>
+              <text x="570" y="238" text-anchor="middle" class="d-sub">do it, then PC = PC + 1</text>
+              <line x1="520" y1="78" x2="616" y2="78" class="d-axis" stroke-width="1.8" marker-end="url(#m1a)"/>
+              <path d="M 715 110 C 715 160, 690 190, 668 202" fill="none" stroke="#7e8599" stroke-width="1.8" marker-end="url(#m1a)"/>
+              <path d="M 472 222 C 400 210, 390 150, 415 114" fill="none" stroke="#7e8599" stroke-width="1.8" marker-end="url(#m1a)"/>
+              <text x="415" y="168" class="d-flow">repeat, forever</text>
+              <path d="M 204 107 C 260 107, 270 82, 326 80" fill="none" stroke="#3fb5ff" stroke-width="1.8" marker-end="url(#m1c)"/>
+              <text x="236" y="70" class="d-flow d-cyan">instruction = a number</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The loop that runs the world.</strong> Instructions are ordinary numbers stored in memory. The <span class="term" data-tip="The register holding the address of the next instruction to run.">program counter</span> points at the next one; the CPU fetches it, decodes what the number means, executes it, bumps the PC, and repeats.</figcaption>
+          </figure>
+
+          <h4>A worked example, by hand</h4>
+          <p>
+            Let's invent the smallest possible machine and run it on paper. Our
+            toy CPU has 16 memory cells (addresses 0–15), one working register
+            called <strong>A</strong> (a register is a scratch value inside the
+            CPU — Module 02 is all about them), and a PC. Each instruction is one
+            byte: the first hex digit says <em>what to do</em> — the
+            <span class="term" data-tip="The part of an instruction's number that names the operation — 'load', 'add', 'store', 'jump'. The rest of the bits are its operands.">opcode</span>
+            — and the second says <em>which cell to do it to</em>. Our whole
+            instruction set is four opcodes: <code>1n</code>&nbsp;=&nbsp;load
+            cell&nbsp;<em>n</em> into A, <code>2n</code>&nbsp;=&nbsp;add
+            cell&nbsp;<em>n</em> to A, <code>3n</code>&nbsp;=&nbsp;store A into
+            cell&nbsp;<em>n</em>, <code>4n</code>&nbsp;=&nbsp;jump to
+            cell&nbsp;<em>n</em>.
+          </p>
+          <p>
+            Now put this five-instruction program in cells 0–4, with data in
+            cells 12–14: <code>1E&nbsp;2D&nbsp;2C&nbsp;3E&nbsp;40</code>. Read it
+            with the table above: <em>load cell 14, add cell 13, add cell 12,
+            store cell 14, jump to 0</em>. Cell 13 holds 2 and cell 12 holds 1,
+            so each trip round the loop the number in cell 14 grows by 3. That's
+            it — a counter, the &ldquo;hello world&rdquo; of hardware. The lab
+            below is this exact machine. Press <strong>Step</strong> and watch
+            each fetch, decode and execute happen with your own eyes; press
+            <strong>Run</strong> and watch it become a program. This is a
+            deliberately generic CPU — in Module 08 we replace it with a real,
+            working 68000.
+          </p>
+
+          <div class="lab" id="lab-toycpu">
+            <div class="lab-head"><span class="dot"></span><span class="title">Toy-CPU lab — a visible fetch–decode–execute machine</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <div class="tc-cols">
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Memory · 16 cells</div>
+                  <div class="tc-mem" data-tc-mem aria-label="Toy CPU memory cells"></div>
+                </div>
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Registers</div>
+                  <div class="tc-regs" data-tc-regs></div>
+                  <div class="tc-phase" data-tc-phase aria-hidden="true">
+                    <span data-phase="fetch">Fetch</span><span data-phase="decode">Decode</span><span data-phase="execute">Execute</span>
+                  </div>
+                  <div class="tc-narrate" data-tc-narrate aria-live="polite">Press <b>Step</b> to run one phase of the loop, or <b>Run</b> to let it fly.</div>
+                </div>
+              </div>
+              <div class="controls">
+                <button class="play-btn" data-tc-step>Step</button>
+                <button class="play-btn" data-tc-run style="background:linear-gradient(180deg,var(--red),var(--red-d));color:#170a08">Run</button>
+                <button class="play-btn" data-tc-reset style="background:linear-gradient(180deg,#2c3040,#232736);color:var(--ink)">Reset</button>
+                <span style="font-size:12.5px;color:var(--muted)">Red = where the PC points · blue = memory being read · gold = memory being written.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A CPU repeats one loop forever: fetch an instruction, decode it, execute it.</li>
+              <li>Instructions are ordinary numbers in memory — programs and data share the same pigeonholes.</li>
+              <li>The program counter is the bookmark; a branch is an instruction that rewrites it.</li>
+              <li>An instruction's number splits into an opcode (what to do) and operands (what to do it to).</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a class="disabled" aria-disabled="true"><span class="dir">← Prev</span><span class="ttl">Start of course</span></a>
+            <a class="next" href="#registers"><span class="dir">Next →</span><span class="ttl">02 · Registers, memory &amp; the ISA</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 02 --- -->
+      <section class="doc" id="registers">
+        <div class="mod-head">
+          <span class="eye">Module 02 <span class="part-tag">· Part I</span></span>
+          <h3>Registers, memory &amp; the ISA</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn why CPUs keep a tiny set of super-fast registers, the difference between RISC and CISC, and what &ldquo;the 68000&rdquo; actually names.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Our toy CPU had one working register, A. Real processors have a
+            couple of dozen, and the reason is distance — literally. Memory is a
+            large structure physically far (in chip terms) from the circuits that
+            do arithmetic, so every trip to it costs time. A
+            <strong>register</strong> is a small storage slot built
+            <em>inside</em> the CPU, right next to the arithmetic. It holds one
+            value — on the 68000, 32 bits — and reading or writing it costs
+            almost nothing. Registers are the workbench; memory is the warehouse.
+            There are only a handful of registers precisely <em>because</em>
+            they're so close: you can't fit a warehouse on a workbench.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The workbench and the warehouse</span>
+            <p>
+              A carpenter doesn't walk to the warehouse for every screw. They
+              fetch a tray of parts to the bench, work there — where everything
+              is within arm's reach — and carry results back when done. A
+              <span class="term" data-tip="A small, ultra-fast storage slot inside the CPU itself. Arithmetic happens in or between registers, far faster than reaching memory.">register</span>
+              is a spot on the bench; a <strong>load</strong> is the walk to the
+              warehouse shelf; a <strong>store</strong> is the walk back. Good
+              code, like a good carpenter, organises the work to stay at the
+              bench as long as possible.
+            </p>
+          </div>
+
+          <p>
+            Now, an important fork in the road — one this course leans on. There
+            are two philosophies about how instructions may touch memory. In a
+            <span class="term" data-tip="Reduced Instruction Set Computer — simple, uniform, fixed-length instructions; arithmetic works only register-to-register, and only explicit loads/stores touch memory.">RISC</span>
+            machine, arithmetic is <em>only</em> allowed register-to-register,
+            and the only instructions that touch memory are explicit loads and
+            stores. In a
+            <span class="term" data-tip="Complex Instruction Set Computer — richer, variable-length instructions; a single instruction may read memory, compute, and write memory. The 68000 is CISC.">CISC</span>
+            machine, a single instruction may reach into memory, compute, and
+            write the result back to memory, all by itself. The 68000 — the
+            Genesis' main CPU — is proudly CISC: an instruction like
+            <code>ADD.W&nbsp;D0,(A1)</code> reads a word from the address in A1,
+            adds a register to it, and writes it back, in one line. Fewer, more
+            powerful instructions; the price is that each is more elaborate
+            inside. Keep this contrast in your pocket — it explains why the
+            68000's instruction set (Module 08) feels so expressive, and why
+            emulating it (Module 13) is a particular kind of work.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 250" role="img" aria-label="RISC keeps arithmetic in registers; CISC lets one instruction touch memory directly">
+              <defs><marker id="m2c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#3fb5ff"/></marker><marker id="m2m" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#ffc44d"/></marker></defs>
+              <text x="30" y="30" class="d-tag d-cyan">RISC — load, compute, store (three steps)</text>
+              <rect x="30" y="46" width="150" height="150" rx="10" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="105" y="128" text-anchor="middle" class="d-sub">Memory</text>
+              <rect x="250" y="46" width="180" height="66" rx="9" class="d-fill-panel d-cyan-s" stroke-width="1.4"/>
+              <text x="340" y="74" text-anchor="middle" class="d-label" style="font-size:13px">Registers</text>
+              <text x="340" y="94" text-anchor="middle" class="d-sub">all arithmetic here</text>
+              <path d="M 180 90 C 210 82, 224 78, 246 76" fill="none" stroke="#3fb5ff" stroke-width="1.7" marker-end="url(#m2c)"/>
+              <text x="192" y="66" class="d-flow d-cyan">load</text>
+              <path d="M 246 104 C 224 120, 210 150, 182 160" fill="none" stroke="#ffc44d" stroke-width="1.7" marker-end="url(#m2m)"/>
+              <text x="196" y="150" class="d-flow d-magenta">store</text>
+              <text x="470" y="30" class="d-tag d-violet">CISC — one instruction does all three</text>
+              <rect x="470" y="46" width="150" height="150" rx="10" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="545" y="128" text-anchor="middle" class="d-sub">Memory</text>
+              <rect x="700" y="90" width="180" height="66" rx="9" class="d-fill-panel d-violet-s" stroke-width="1.4"/>
+              <text x="790" y="118" text-anchor="middle" class="d-label" style="font-size:12px">ADD.W D0,(A1)</text>
+              <text x="790" y="138" text-anchor="middle" class="d-sub">read + add + write-back</text>
+              <path d="M 620 110 C 660 108, 668 118, 696 120" fill="none" stroke="#ff5347" stroke-width="2" marker-end="url(#m2m)"/>
+              <path d="M 696 128 C 668 134, 660 150, 622 150" fill="none" stroke="#ff5347" stroke-width="2"/>
+              <text x="632" y="98" class="d-flow d-violet">one line, in and out</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Two philosophies.</strong> A <span class="term" data-tip="Only loads and stores touch memory; arithmetic is register-only.">RISC</span> machine splits &ldquo;add a value in memory&rdquo; into load, add, store. A <span class="term" data-tip="One instruction may read memory, compute and write it back.">CISC</span> machine like the 68000 folds all three into a single, richer instruction.</figcaption>
+          </figure>
+
+          <h4>What &ldquo;the 68000&rdquo; actually names</h4>
+          <p>
+            Here's a distinction worth getting straight early. An
+            <strong>instruction set architecture</strong>
+            (<span class="term" data-tip="Instruction Set Architecture — the documented contract of instructions, registers and behaviours a CPU promises to honour. Software targets the ISA, not one specific chip.">ISA</span>)
+            is a <em>contract</em>: the documented list of instructions, the
+            registers, and exactly what each instruction must do. An
+            <strong>implementation</strong> is a physical chip that honours the
+            contract. <strong>Motorola 68000</strong> (the &ldquo;m68k&rdquo;) is
+            both a specific 1979 chip and the seed of a whole family — the 68010,
+            68020, up to the 68060, plus embedded CPU32 cores — all speaking a
+            compatible ISA. The Genesis uses the original 68000 (in the Model&nbsp;1,
+            a discrete Motorola/Hitachi part; in later models, the same core
+            folded into a bigger ASIC). Any chip honouring the contract runs the
+            same programs; how fast is the implementation's own business. This
+            split is exactly what makes emulation <em>possible</em>: Genesis Plus
+            GX and BlastEm (Part III) implement the 68000 contract in software on
+            your PC.
+          </p>
+          <p>
+            The 68000 contract that matters to us is a clean, roomy register
+            file — one of the reasons programmers loved this chip:
+          </p>
+
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Registers</th><th>Width</th><th>What they hold</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pill ax">D0 – D7</span></td><td><span class="crc">32-bit</span></td><td>Eight general-purpose <strong>data</strong> registers: integers, counters, pixels, flags — the arithmetic workbench.</td></tr>
+                <tr><td><span class="pill axwii">A0 – A7</span></td><td><span class="crc">32-bit</span></td><td>Eight <strong>address</strong> registers: pointers into memory. <strong>A7 doubles as the stack pointer</strong> (Module 04).</td></tr>
+                <tr><td><span class="pill zelda">PC</span></td><td><span class="crc">24-bit used</span></td><td>The bookmark from Module 01. The address bus is 24 bits, so it reaches 16 MB.</td></tr>
+                <tr><td><span class="pill util">SR / CCR</span></td><td><span class="crc">16-bit</span></td><td>The status register; its low byte is the condition-code register — flags <strong>X N Z V C</strong> (Module 08) — its high byte holds the interrupt mask (Module 05).</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Two register banks, eight of each, all 32 bits wide even though the
+            chip talks to memory 16 bits at a time — a generous, orthogonal
+            layout that made the 68000 a joy to program by hand. We'll put every
+            one of these to work in Part II.
+          </p>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Registers are a few dozen ultra-fast slots inside the CPU; memory is the big, slow warehouse.</li>
+              <li>RISC forbids arithmetic-on-memory; CISC (the 68000) allows a single instruction to read, compute and write memory.</li>
+              <li>An ISA is a contract; a chip is an implementation. The 68000 is a family, and emulators implement its contract in software.</li>
+              <li>The 68000 gives you eight 32-bit data registers (D0–D7) and eight 32-bit address registers (A0–A7, with A7 = stack pointer).</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#loop"><span class="dir">← Prev</span><span class="ttl">01 · The fetch–decode–execute loop</span></a>
+            <a class="next" href="#binary"><span class="dir">Next →</span><span class="ttl">03 · Numbers in binary</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 03 --- -->
+      <section class="doc" id="binary">
+        <div class="mod-head">
+          <span class="eye">Module 03 <span class="part-tag">· Part I</span></span>
+          <h3>Numbers in binary</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how bits encode whole numbers and negative numbers (two's complement), why hex is the natural shorthand, and how bytes group into the 68000's words and longwords — big-endian.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Everything a CPU touches is stored in <strong>bits</strong> —
+            switches that are either 0 or 1. A row of bits reads as a number in
+            <strong>binary</strong>, exactly like decimal but with columns worth
+            1, 2, 4, 8, 16… instead of 1, 10, 100. So <code>1011</code> is
+            8&nbsp;+&nbsp;2&nbsp;+&nbsp;1&nbsp;=&nbsp;11. With <em>n</em> bits you
+            get 2<sup>n</sup> patterns: a byte (8 bits) covers 0–255, and the
+            68000's 32-bit registers cover a bit over four billion values.
+          </p>
+          <p>
+            Writing long binary strings by hand is miserable, so everyone uses
+            <strong>hexadecimal</strong> — base 16, digits 0–9 then A–F. Its
+            charm is that one hex digit is exactly four bits, so a byte is two
+            neat hex digits and a 68000 word is four. When you see
+            <code>$C00000</code> or <code>0xFF0000</code> later, that
+            <code>$</code> (the traditional 68000 prefix) or <code>0x</code> just
+            means &ldquo;read this in hex&rdquo;. Get comfortable now: hardware
+            addresses are always written this way.
+          </p>
+          <p>
+            Negative numbers need a convention, and the universal one is
+            <strong>two's complement</strong>: keep counting past the top and let
+            the value wrap around, like a car's odometer rolling over — except we
+            <em>relabel</em> the top half of the patterns as the negatives. In 8
+            bits, <code>11111111</code> is −1, <code>11111110</code> is −2, down
+            to <code>10000000</code>&nbsp;=&nbsp;−128. The lovely consequence: the
+            same adder circuit adds signed and unsigned numbers correctly without
+            knowing which it's doing — and to negate a number you simply flip
+            every bit and add one. The price is a fixed window (−128…+127 for a
+            byte) and arithmetic that silently wraps when you leave it — a wrap
+            the 68000 flags for you (Module 08).
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The odometer that rolls backwards</span>
+            <p>
+              An old car odometer at <code>000000</code>, wound back one click,
+              shows <code>999999</code> — everyone reads that as
+              &ldquo;−1&rdquo;, not &ldquo;nine hundred thousand&rdquo;.
+              <span class="term" data-tip="The universal scheme for signed integers: the top half of the bit patterns are relabelled as negatives, so counting down from zero wraps to all-ones = −1.">Two's complement</span>
+              is the same trick in binary: the counter has a fixed number of
+              wheels, and the numbers just below zero are the all-nines
+              (all-ones) patterns at the top. Nothing about the wheels changed —
+              only how we agree to read the top half.
+            </p>
+          </div>
+
+          <h4>Bytes, words &amp; longwords — and which end comes first</h4>
+          <p>
+            The 68000 groups bytes into three sizes you'll meet constantly: a
+            <strong>byte</strong> (8 bits, <code>.b</code>), a
+            <strong>word</strong> (16 bits, <code>.w</code>), and a
+            <strong>longword</strong> (32 bits, <code>.l</code>). Most
+            instructions let you pick the size. But storing a multi-byte value in
+            byte-addressed memory forces a choice: which byte goes in the lower
+            address? The 68000 is
+            <span class="term" data-tip="Big-endian: the most significant byte of a multi-byte value is stored at the lowest address — the way we write numbers left to right. The 68000 (and thus the Genesis) is big-endian.">big-endian</span>
+            — the <em>most significant</em> byte goes first, at the lowest
+            address, the way we write numbers left-to-right. So the longword
+            <code>$12345678</code> sits in memory as
+            <code>12&nbsp;34&nbsp;56&nbsp;78</code>. Your PC's x86 CPU is the
+            opposite (little-endian), which is exactly the kind of mismatch an
+            emulator has to bridge byte-by-byte (Module 14).
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 210" role="img" aria-label="The longword 0x12345678 stored big-endian across four ascending memory addresses">
+              <text x="30" y="30" class="d-tag">The longword <tspan class="d-num">$12345678</tspan> in big-endian memory</text>
+              <rect x="30"  y="52" width="150" height="60" rx="8" class="d-fill-panel d-violet-s" stroke-width="1.4"/><text x="105" y="80" text-anchor="middle" class="d-num">12</text><text x="105" y="98" text-anchor="middle" class="d-sub">most significant</text>
+              <rect x="196" y="52" width="150" height="60" rx="8" class="d-cell"/><text x="271" y="80" text-anchor="middle" class="d-num">34</text>
+              <rect x="362" y="52" width="150" height="60" rx="8" class="d-cell"/><text x="437" y="80" text-anchor="middle" class="d-num">56</text>
+              <rect x="528" y="52" width="150" height="60" rx="8" class="d-fill-panel d-cyan-s" stroke-width="1.4"/><text x="603" y="80" text-anchor="middle" class="d-num">78</text><text x="603" y="98" text-anchor="middle" class="d-sub">least significant</text>
+              <text x="105" y="140" text-anchor="middle" class="d-sub">addr +0</text>
+              <text x="271" y="140" text-anchor="middle" class="d-sub">addr +1</text>
+              <text x="437" y="140" text-anchor="middle" class="d-sub">addr +2</text>
+              <text x="603" y="140" text-anchor="middle" class="d-sub">addr +3</text>
+              <text x="30" y="180" class="d-flow">low address ───────────────────────────────▶ high address</text>
+              <text x="700" y="86" class="d-flow d-violet">big end first =</text>
+              <text x="700" y="104" class="d-flow d-violet">&ldquo;big-endian&rdquo;</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Which end comes first.</strong> Big-endian stores the <span class="term" data-tip="The byte carrying the largest place value — the '12' in $12345678.">most significant byte</span> at the lowest address. Read the four bytes left to right and you read the number left to right — tidy for humans, and the source of endian-swap bugs when a little-endian host emulates it.</figcaption>
+          </figure>
+
+          <p>
+            Now go poke the bits yourself. Every square below is a button. Flip
+            them and read the same pattern three ways at once — as an unsigned
+            number, as a two's-complement <em>signed</em> number, and in hex.
+            Load the presets to meet the classic citizens: how <code>−1</code> is
+            all-ones, why <code>10000000</code> is the most-negative value with no
+            positive twin, and where the wrap happens. Then hit
+            <strong>negate</strong> and watch invert-and-add-one turn a number
+            into its negative — the exact move the 68000's <code>NEG</code>
+            instruction makes.
+          </p>
+
+          <div class="lab" id="lab-bits">
+            <div class="lab-head"><span class="dot"></span><span class="title">Bit lab — two's complement you can flip</span><span class="badge">binary · live</span></div>
+            <div class="lab-body">
+              <div class="bits" data-bits aria-label="Toggle bits of an integer"></div>
+              <div class="bit-legend">
+                <span><span class="sw" style="background:var(--gold)"></span>sign bit (the top bit, negative weight)</span>
+                <span><span class="sw" style="background:var(--blue)"></span>value bits (positive weights)</span>
+              </div>
+              <div class="float-read">
+                <div class="fr"><span class="k">Unsigned</span><span class="v" data-b-uns>—</span></div>
+                <div class="fr"><span class="k">Signed (two's comp.)</span><span class="v" data-b-sig>—</span></div>
+                <div class="fr"><span class="k">Hex / binary</span><span class="v" data-b-hex>—</span></div>
+                <div class="fr"><span class="k">Note</span><span class="v" data-b-note>—</span></div>
+              </div>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Width</label>
+                  <div class="seg-btns" role="group" aria-label="Bit width">
+                    <button class="on" data-b-width="8">8-bit byte</button>
+                    <button data-b-width="16">16-bit word</button>
+                  </div>
+                </div>
+                <div class="ctrl">
+                  <label>Presets</label>
+                  <div class="seg-btns" role="group" aria-label="Presets">
+                    <button data-b-preset="zero">0</button>
+                    <button data-b-preset="one">1</button>
+                    <button data-b-preset="fortytwo">42</button>
+                    <button data-b-preset="neg1">−1</button>
+                    <button data-b-preset="max">max +</button>
+                    <button data-b-preset="min">min −</button>
+                  </div>
+                </div>
+                <button class="play-btn" data-b-negate>Negate (¬ + 1)</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Binary counts in powers of two; hex is its four-bits-per-digit shorthand, and <code>$</code>/<code>0x</code> flag it.</li>
+              <li>Two's complement relabels the top half of the patterns as negatives, so one adder handles signed and unsigned alike; negate = invert + 1.</li>
+              <li>The 68000 works in bytes (.b), words (.w) and longwords (.l), and stores multi-byte values big-endian: most significant byte first.</li>
+              <li>Big-endian vs your PC's little-endian is a real mismatch an emulator must bridge.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#registers"><span class="dir">← Prev</span><span class="ttl">02 · Registers, memory &amp; the ISA</span></a>
+            <a class="next" href="#branches"><span class="dir">Next →</span><span class="ttl">04 · Branches, the stack &amp; subroutines</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 04 --- -->
+      <section class="doc" id="branches">
+        <div class="mod-head">
+          <span class="eye">Module 04 <span class="part-tag">· Part I</span></span>
+          <h3>Branches, the stack &amp; subroutines</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand how a CPU makes decisions and loops with conditional branches, and how the stack lets code call subroutines and return.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A program that only ran straight down its list of instructions could
+            never make a decision or repeat anything. The escape hatch is the
+            <strong>branch</strong> from Module 01 — an instruction that
+            overwrites the PC. Unconditional branches (<code>BRA</code>,
+            &ldquo;branch always&rdquo;) jump no matter what. The interesting ones
+            are <strong>conditional</strong>: <code>BEQ</code> (branch if equal),
+            <code>BNE</code> (branch if not equal), <code>BMI</code> (branch if
+            minus), and a dozen more. Each asks a yes/no question and only jumps
+            if the answer is yes.
+          </p>
+          <p>
+            But branch on <em>what</em>? On the <strong>flags</strong> —
+            single-bit results left behind by the previous arithmetic. When the
+            68000 compares or subtracts two numbers, it records: was the result
+            zero (the <span class="term" data-tip="Zero flag — set when the result of an operation is zero. BEQ branches when Z is set.">Z</span>
+            flag)? Negative (the <span class="term" data-tip="Negative flag — set when the result's top bit is 1, i.e. the value is negative in two's complement.">N</span>
+            flag)? Did it carry or overflow? A comparison followed by a
+            conditional branch is the universal shape of an <code>if</code>:
+            &ldquo;compare A with B; branch-if-less to the else-part&rdquo;. A
+            loop is the same with the branch pointing backwards. We'll meet the
+            68000's full flag set — X N Z V C — and watch it change live in
+            Module 08.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The choose-your-own-adventure book</span>
+            <p>
+              &ldquo;If you open the door, turn to page 40; if you flee, turn to
+              page 12.&rdquo; That instruction <em>is</em> a
+              <span class="term" data-tip="An instruction that changes the program counter only if a condition (a flag) is met — the basis of every if and loop.">conditional branch</span>:
+              a jump to a new page (address) taken only under a condition. And
+              &ldquo;go back to page 3 and try again&rdquo; is a loop. The
+              book's page number is the program counter; your decision is the
+              flag the branch tests.
+            </p>
+          </div>
+
+          <h4>The stack: the CPU's scratch pad of returns</h4>
+          <p>
+            Programs are built from <strong>subroutines</strong> — reusable
+            chunks you can call from many places (draw a sprite, play a sound).
+            Calling one is easy: jump to its address. The hard part is coming
+            <em>back</em> — back to wherever the call came from, which differs
+            every time. The answer is a
+            <span class="term" data-tip="A region of memory used last-in-first-out, addressed through the stack pointer (A7 on the 68000). Return addresses and local data are pushed and popped here.">stack</span>:
+            a region of memory used last-in-first-out, like a spike you skewer
+            receipts on. The 68000 dedicates <strong>A7</strong> as the
+            <span class="term" data-tip="Stack pointer — the address register (A7 on the 68000) that always points at the top of the stack. Pushing decrements it; popping increments it.">stack pointer</span>,
+            always pointing at the top of the stack.
+          </p>
+          <p>
+            When the 68000 executes <code>BSR</code> or <code>JSR</code> (branch/
+            jump to subroutine), it does two things: it <strong>pushes</strong>
+            the return address onto the stack (writes it there and moves A7), then
+            jumps. The subroutine runs, and finishes with <code>RTS</code>
+            (return from subroutine), which <strong>pops</strong> that address
+            back off the stack into the PC — landing exactly where it left off.
+            Because the stack is last-in-first-out, subroutines can call
+            subroutines that call more subroutines, nesting as deep as memory
+            allows, and each <code>RTS</code> unwinds one level. This same stack
+            also saves registers and holds local variables — and, crucially, it's
+            where the CPU stashes its state when an <em>interrupt</em> fires,
+            which is the very next module.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 260" role="img" aria-label="BSR pushes a return address onto the stack; RTS pops it back to resume">
+              <defs><marker id="m4a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker><marker id="m4c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#3fb5ff"/></marker><marker id="m4m" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#ffc44d"/></marker></defs>
+              <rect x="30" y="46" width="230" height="180" rx="10" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="145" y="34" text-anchor="middle" class="d-tag">Main code</text>
+              <rect x="48" y="66" width="194" height="30" rx="5" class="d-cell"/><text x="60" y="86" class="d-sub">…</text>
+              <rect x="48" y="102" width="194" height="30" rx="5" class="d-fill-panel d-cyan-s" stroke-width="1.3"/><text x="60" y="122" class="d-num">BSR DrawSprite</text>
+              <rect x="48" y="138" width="194" height="30" rx="5" class="d-fill-panel d-magenta-s" stroke-width="1.3"/><text x="60" y="158" class="d-num">← return here</text>
+              <rect x="48" y="174" width="194" height="30" rx="5" class="d-cell"/><text x="60" y="194" class="d-sub">…</text>
+              <path d="M 242 117 C 300 117, 300 96, 356 96" fill="none" stroke="#3fb5ff" stroke-width="1.8" marker-end="url(#m4c)"/>
+              <text x="300" y="86" text-anchor="middle" class="d-flow d-cyan">jump in</text>
+              <rect x="360" y="60" width="220" height="120" rx="10" class="d-fill-ground d-stroke-line" stroke-width="1.5"/>
+              <text x="470" y="48" text-anchor="middle" class="d-tag">DrawSprite:</text>
+              <text x="470" y="110" text-anchor="middle" class="d-sub">…do the work…</text>
+              <rect x="380" y="132" width="180" height="30" rx="5" class="d-fill-panel d-amber-s" stroke-width="1.3"/><text x="470" y="152" text-anchor="middle" class="d-num">RTS</text>
+              <path d="M 470 180 C 470 210, 320 210, 250 176" fill="none" stroke="#ffc44d" stroke-width="1.8" marker-end="url(#m4m)"/>
+              <text x="356" y="228" text-anchor="middle" class="d-flow d-magenta">RTS pops the return address back into the PC</text>
+              <rect x="640" y="46" width="230" height="180" rx="10" class="d-fill-panel2 d-violet-s" stroke-width="1.5"/>
+              <text x="755" y="34" text-anchor="middle" class="d-tag d-violet">Stack (via A7)</text>
+              <rect x="660" y="150" width="190" height="30" rx="5" class="d-fill-panel d-violet-s" stroke-width="1.3"/><text x="755" y="170" text-anchor="middle" class="d-num">return address</text>
+              <text x="755" y="120" text-anchor="middle" class="d-sub">A7 → top of stack</text>
+              <text x="755" y="200" text-anchor="middle" class="d-sub">push on BSR · pop on RTS</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Call and return.</strong> <code>BSR</code> pushes the address of the next instruction onto the <span class="term" data-tip="Last-in-first-out memory addressed through A7, the stack pointer.">stack</span> and jumps; the subroutine runs and ends with <code>RTS</code>, which pops that address back into the PC. Nesting works because the stack is last-in-first-out.</figcaption>
+          </figure>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A branch rewrites the PC; a conditional branch does so only when a flag (zero, negative, carry…) says to.</li>
+              <li>Compare-then-branch is the shape of every <code>if</code>; a backward branch is a loop.</li>
+              <li>The stack is last-in-first-out memory addressed through A7, the 68000's stack pointer.</li>
+              <li><code>BSR</code>/<code>JSR</code> push a return address and jump; <code>RTS</code> pops it back — which is how subroutines nest.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#binary"><span class="dir">← Prev</span><span class="ttl">03 · Numbers in binary</span></a>
+            <a class="next" href="#interrupts"><span class="dir">Next →</span><span class="ttl">05 · Interrupts &amp; exceptions</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 05 --- -->
+      <section class="doc" id="interrupts">
+        <div class="mod-head">
+          <span class="eye">Module 05 <span class="part-tag">· Part I</span></span>
+          <h3>Interrupts &amp; exceptions</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn how hardware grabs the CPU's attention mid-program through interrupts, how the vector table routes them, and how exceptions handle errors.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            So far our CPU only does what its program tells it, in order. But a
+            games console is full of hardware with its own sense of timing: the
+            video chip finishes drawing a frame, a controller button changes, a
+            timer expires. The CPU can't afford to sit in a loop constantly
+            asking &ldquo;are we there yet?&rdquo; for each. It needs the hardware
+            to <em>tap it on the shoulder</em>. That tap is an
+            <strong>interrupt</strong>.
+          </p>
+          <p>
+            An interrupt is a signal wire into the CPU. When a device raises it,
+            the 68000 finishes its current instruction, then automatically does
+            something remarkable: it <strong>pushes its current state onto the
+            stack</strong> (the PC and status register from Module 04), and jumps
+            to a special routine — an
+            <span class="term" data-tip="Interrupt Service Routine — the subroutine the CPU jumps to when an interrupt fires. It handles the event, then returns with RTE.">interrupt handler</span>
+            — written to deal with that event. The handler does its quick job
+            (read the controller, kick off the next frame's work), then executes
+            <code>RTE</code> (return from exception), which pops the saved state
+            back and resumes the interrupted program <em>exactly</em> where it
+            was, as if nothing happened. The main program never even knows it was
+            paused.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The chef and the doorbell</span>
+            <p>
+              A chef is chopping vegetables when the doorbell rings. They don't
+              ignore it and they don't stand waiting by the door all evening —
+              they finish the current chop, set the knife down <em>exactly where
+              it was</em>, answer the door, then return and pick the knife back
+              up mid-carrot. The doorbell is the
+              <span class="term" data-tip="A hardware signal that makes the CPU pause its program, run a handler, then resume exactly where it left off.">interrupt</span>;
+              setting the knife down is pushing state to the stack; picking it
+              back up is <code>RTE</code>. The genius is that the vegetables never
+              notice.
+            </p>
+          </div>
+
+          <p>
+            How does the CPU know <em>which</em> handler to run? Through the
+            <strong>vector table</strong>: a list of handler addresses parked at
+            the very bottom of memory. Each kind of event has a numbered slot.
+            The 68000's table lives at address <code>$000000</code> and is why the
+            first two longwords of every cartridge are so special — slot 0 is the
+            <strong>initial stack pointer</strong> and slot 1 is the
+            <strong>initial PC</strong> (the reset vector), loaded automatically
+            when the console powers on. Further slots hold the addresses of the
+            interrupt handlers and of the
+            <span class="term" data-tip="An internally-generated interrupt caused by the program itself — an illegal instruction, a divide by zero, an address error. Handled through the same vector table.">exception</span>
+            handlers: an <code>exception</code> is an interrupt raised by the CPU
+            <em>itself</em> when something goes wrong — a divide by zero, an
+            illegal instruction, an odd-address word access. Same machinery,
+            internal trigger.
+          </p>
+          <p>
+            The 68000 also supports <strong>priority</strong>: interrupts carry a
+            level 1–7, and a mask in the status register lets code ignore anything
+            below a chosen level, so a high-priority event can interrupt a
+            low-priority handler but not vice-versa. Hold that thought — in Module
+            12 we'll see the Genesis wire its video chip to two specific levels
+            (VBlank at 6, HBlank at 4) to drive the raster tricks that gave Sega
+            games their look.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 270" role="img" aria-label="An interrupt saves state to the stack, reads a handler address from the vector table, runs it, and returns">
+              <defs><marker id="m5a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker><marker id="m5c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#3fb5ff"/></marker></defs>
+              <rect x="30" y="60" width="200" height="150" rx="10" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="130" y="48" text-anchor="middle" class="d-tag">Vector table @ $000000</text>
+              <rect x="46" y="76" width="168" height="26" rx="5" class="d-fill-panel d-violet-s" stroke-width="1.3"/><text x="56" y="94" class="d-sub">0 · initial SP</text>
+              <rect x="46" y="106" width="168" height="26" rx="5" class="d-fill-panel d-violet-s" stroke-width="1.3"/><text x="56" y="124" class="d-sub">1 · initial PC (reset)</text>
+              <rect x="46" y="136" width="168" height="26" rx="5" class="d-cell"/><text x="56" y="154" class="d-sub">… bus/address error …</text>
+              <rect x="46" y="166" width="168" height="26" rx="5" class="d-fill-panel d-cyan-s" stroke-width="1.3"/><text x="56" y="184" class="d-sub">28 · level-6 (VBlank)</text>
+              <text x="450" y="40" text-anchor="middle" class="d-tag">a device raises an interrupt</text>
+              <rect x="330" y="54" width="240" height="52" rx="9" class="d-fill-panel d-amber-s" stroke-width="1.4"/>
+              <text x="450" y="78" text-anchor="middle" class="d-label" style="font-size:12.5px">1 · push PC + SR to stack</text>
+              <text x="450" y="96" text-anchor="middle" class="d-sub">current work is saved</text>
+              <line x1="450" y1="106" x2="450" y2="130" class="d-axis" stroke-width="1.7" marker-end="url(#m5a)"/>
+              <rect x="330" y="132" width="240" height="52" rx="9" class="d-fill-panel d-cyan-s" stroke-width="1.4"/>
+              <text x="450" y="156" text-anchor="middle" class="d-label" style="font-size:12.5px">2 · read handler from vector</text>
+              <text x="450" y="174" text-anchor="middle" class="d-sub">jump there &amp; run it</text>
+              <line x1="450" y1="184" x2="450" y2="208" class="d-axis" stroke-width="1.7" marker-end="url(#m5a)"/>
+              <rect x="330" y="210" width="240" height="46" rx="9" class="d-fill-panel d-violet-s" stroke-width="1.4"/>
+              <text x="450" y="238" text-anchor="middle" class="d-label" style="font-size:12.5px">3 · RTE → resume as if nothing happened</text>
+              <line x1="230" y1="179" x2="326" y2="150" class="d-axis" stroke-width="1.8" marker-end="url(#m5c)"/>
+              <rect x="640" y="90" width="230" height="90" rx="10" class="d-fill-ground d-stroke-line" stroke-width="1.5"/>
+              <text x="755" y="78" text-anchor="middle" class="d-tag">Main program</text>
+              <text x="755" y="130" text-anchor="middle" class="d-sub">chopping away…</text>
+              <text x="755" y="152" text-anchor="middle" class="d-sub">paused, then resumed</text>
+              <path d="M 570 158 C 610 150, 610 138, 638 135" fill="none" stroke="#7e8599" stroke-width="1.6" marker-end="url(#m5a)"/>
+            </svg>
+            <figcaption class="fig-cap"><strong>Shoulder-tap, handled.</strong> An interrupt makes the 68000 save its state to the stack, look up the matching handler in the <span class="term" data-tip="A table of handler addresses at $000000; slot 0 is the initial stack pointer, slot 1 the reset PC.">vector table</span>, run it, and resume with <code>RTE</code>. Exceptions (errors) use the same path, triggered from inside the CPU.</figcaption>
+          </figure>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Interrupts let hardware tap the CPU on the shoulder instead of the CPU polling in a loop.</li>
+              <li>On an interrupt the 68000 saves PC + SR to the stack, runs a handler, and resumes with <code>RTE</code>.</li>
+              <li>The vector table at <code>$000000</code> routes each event to its handler; slots 0 and 1 are the reset SP and PC.</li>
+              <li>Exceptions are internally-triggered interrupts (errors); interrupt levels 1–7 plus a mask give priority.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#branches"><span class="dir">← Prev</span><span class="ttl">04 · Branches, the stack &amp; subroutines</span></a>
+            <a class="next" href="#m68k"><span class="dir">Next → Part II</span><span class="ttl">06 · Meet the Motorola 68000</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART II ============= -->
+      <section class="part" id="part-2">
+        <div class="part-inner">
+          <div class="kicker">Part II</div>
+          <h3>The Genesis' two brains</h3>
+          <p>
+            Now we put the Part&nbsp;I toolkit into real silicon — and the
+            Genesis has an unusual amount of it. Where most consoles have one
+            CPU, the Genesis has <em>two</em>: a 16/32-bit Motorola 68000 running
+            the game, and an 8-bit Zilog Z80 running the sound, inherited wholesale
+            from the Master System. These seven modules cover the 68000 itself —
+            its registers, addressing modes and instruction set — then the Z80,
+            the bus they fight over, the 24-bit memory map that ties everything
+            together, and finally the interrupts that pace the whole machine to
+            the television.
+          </p>
+          <div class="part-meta"><span>Modules <b>06–12</b></span><span>Difficulty <b>Hardware</b></span><span>Labs <b>4 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 06 --- -->
+      <section class="doc" id="m68k">
+        <div class="mod-head">
+          <span class="eye">Module 06 <span class="part-tag">· Part II</span></span>
+          <h3>Meet the Motorola 68000</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the console's main CPU — where it came from, its clock and buses, and its place in the system beside the Z80, the VDP and the sound chips.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The <strong>Motorola 68000</strong> is the Genesis' main processor —
+            the chip that runs the game. Introduced in 1979, by the late '80s it
+            was the workhorse of serious computing: the original Macintosh, the
+            Amiga, the Atari ST, countless arcade boards. Sega's choice of it for
+            the Mega Drive in 1988 is a big part of why the console punched
+            above its weight — arcade programmers already knew this chip
+            intimately, and ports came naturally. In the Genesis it runs at
+            <strong>7.67&nbsp;MHz</strong> on NTSC machines (7.60&nbsp;MHz on
+            PAL), derived by dividing the master crystal.
+          </p>
+          <p>
+            The &ldquo;16/32-bit&rdquo; label needs unpacking, because it's the
+            key to the chip's character. Internally the 68000 is a
+            <strong>32-bit</strong> machine: its registers (Module 02) are all 32
+            bits, and it computes on 32-bit longwords. But it talks to the outside
+            world through a <strong>16-bit data bus</strong> — it fetches memory
+            two bytes at a time — and a
+            <span class="term" data-tip="The set of wires carrying a memory address out of the CPU. The 68000's is 24 bits wide, so it can address 2^24 = 16 MB.">24-bit address bus</span>,
+            giving it a <strong>16&nbsp;MB</strong> address space. So a 32-bit
+            longword access takes two bus cycles. This split — 32-bit brain,
+            16-bit mouth — is why you'll see it called both a 16-bit and a 32-bit
+            CPU, and why the &ldquo;16-BIT&rdquo; on the console's lid was
+            marketing shorthand for the bus, not the whole story.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A wide desk, a narrow doorway</span>
+            <p>
+              Imagine an accountant with a huge desk who can lay out enormous
+              32-column ledgers and work on them all at once — that's the 68000's
+              32-bit interior. But the office door is only wide enough to carry
+              two columns of paper at a time, so fetching a full ledger from the
+              archive means two trips. The
+              <span class="term" data-tip="The 16-bit path over which the 68000 moves data to and from memory — half the width of its internal 32-bit registers, so a 32-bit access takes two transfers.">16-bit data bus</span>
+              is that doorway: it doesn't shrink the desk, it just meters how fast
+              paper moves in and out.
+            </p>
+          </div>
+
+          <p>
+            The 68000 is not alone on the board. It is the master of the system,
+            but it shares the console with a cast of specialist chips, each doing
+            what it does far better than a general CPU could:
+          </p>
+
+          <figure class="dsp-diagram">
+            <svg viewBox="0 0 940 460" role="img" aria-labelledby="sysdiag-title sysdiag-desc">
+              <title id="sysdiag-title">Genesis system architecture around the 68000</title>
+              <desc id="sysdiag-desc">The Motorola 68000 is the master, connected over a 16-bit bus to 64 KB of work RAM, the cartridge ROM, and the VDP video chip. A separate Zilog Z80 with its own 8 KB RAM drives the YM2612 FM chip and the SN76489 PSG; the 68000 can request the Z80's bus.</desc>
+              <defs><marker id="m6a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker></defs>
+
+              <!-- 68000 -->
+              <rect x="24" y="150" width="230" height="150" rx="14" class="d-fill-ground d-violet-s" stroke-width="1.6"/>
+              <text x="44" y="182" class="d-tag d-violet">Motorola 68000</text>
+              <text x="44" y="202" class="d-sub">main CPU · 7.67 MHz</text>
+              <text x="44" y="226" class="d-sub">32-bit regs · 16-bit data bus</text>
+              <text x="44" y="246" class="d-sub">24-bit address (16 MB)</text>
+              <text x="44" y="272" class="d-sub">runs the game logic</text>
+
+              <!-- work RAM -->
+              <rect x="300" y="40" width="180" height="70" rx="10" class="d-fill-panel2 d-cyan-s" stroke-width="1.5"/>
+              <text x="390" y="70" text-anchor="middle" class="d-label" style="font-size:13px">Work RAM</text>
+              <text x="390" y="90" text-anchor="middle" class="d-sub">64 KB · $FF0000</text>
+              <!-- cart -->
+              <rect x="300" y="150" width="180" height="70" rx="10" class="d-fill-panel2 d-amber-s" stroke-width="1.5"/>
+              <text x="390" y="180" text-anchor="middle" class="d-label" style="font-size:13px">Cartridge ROM</text>
+              <text x="390" y="200" text-anchor="middle" class="d-sub">up to 4 MB · $000000</text>
+              <!-- VDP -->
+              <rect x="300" y="260" width="180" height="90" rx="10" class="d-fill-panel2 d-magenta-s" stroke-width="1.5"/>
+              <text x="390" y="288" text-anchor="middle" class="d-label" style="font-size:13px">VDP (video)</text>
+              <text x="390" y="308" text-anchor="middle" class="d-sub">planes · sprites</text>
+              <text x="390" y="326" text-anchor="middle" class="d-sub">64 KB VRAM · $C00000</text>
+
+              <line x1="254" y1="180" x2="296" y2="90" class="d-axis" stroke-width="1.8" marker-end="url(#m6a)"/>
+              <line x1="254" y1="190" x2="296" y2="185" class="d-axis" stroke-width="1.8" marker-end="url(#m6a)"/>
+              <line x1="254" y1="210" x2="296" y2="295" class="d-axis" stroke-width="1.8" marker-end="url(#m6a)"/>
+              <text x="270" y="150" class="d-flow">16-bit bus</text>
+
+              <!-- Z80 subsystem -->
+              <rect x="560" y="150" width="220" height="150" rx="14" class="d-fill-ground d-cyan-s" stroke-width="1.6"/>
+              <text x="580" y="182" class="d-tag d-cyan">Zilog Z80</text>
+              <text x="580" y="202" class="d-sub">sound CPU · 3.58 MHz</text>
+              <text x="580" y="222" class="d-sub">8 KB private RAM</text>
+              <text x="580" y="246" class="d-sub">runs the sound driver</text>
+              <line x1="254" y1="230" x2="556" y2="230" class="d-axis" stroke-width="1.8" marker-end="url(#m6a)"/>
+              <text x="405" y="248" text-anchor="middle" class="d-flow">68000 can hold the Z80 bus · $A00000</text>
+
+              <!-- sound chips -->
+              <rect x="820" y="120" width="100" height="70" rx="10" class="d-fill-panel2 d-magenta-s" stroke-width="1.5"/>
+              <text x="870" y="150" text-anchor="middle" class="d-label" style="font-size:12px">YM2612</text>
+              <text x="870" y="168" text-anchor="middle" class="d-sub">6-ch FM</text>
+              <rect x="820" y="210" width="100" height="70" rx="10" class="d-fill-panel2 d-amber-s" stroke-width="1.5"/>
+              <text x="870" y="240" text-anchor="middle" class="d-label" style="font-size:12px">SN76489</text>
+              <text x="870" y="258" text-anchor="middle" class="d-sub">PSG</text>
+              <line x1="780" y1="200" x2="816" y2="165" class="d-axis" stroke-width="1.7" marker-end="url(#m6a)"/>
+              <line x1="780" y1="245" x2="816" y2="245" class="d-axis" stroke-width="1.7" marker-end="url(#m6a)"/>
+
+              <text x="44" y="360" class="d-sub">The audio chips get a whole companion course — see the <tspan class="d-cyan">Audio · FM &amp; PSG</tspan> track.</text>
+            </svg>
+            <figcaption class="fig-cap">
+              <strong>The whole system at a glance.</strong> The 68000 is the master, reaching work RAM, the cartridge and the
+              <span class="term" data-tip="Video Display Processor — the Genesis' graphics chip (315-5313 lineage). Planes, sprites, 64 KB of VRAM. Covered by the companion graphics course.">VDP</span>
+              over its 16-bit bus. The Z80 is a second, semi-independent CPU driving the
+              <span class="term" data-tip="Yamaha YM2612 (OPN2) — the six-channel FM synthesis chip responsible for the Genesis' signature sound.">YM2612</span>
+              FM chip and the SN76489 PSG — the subject of Modules 09–10.
+            </figcaption>
+          </figure>
+
+          <div class="specs">
+            <div class="spec"><div class="k">Core</div><div class="v">68000<small> m68k</small></div><div class="d">Motorola, 1979 · CISC</div></div>
+            <div class="spec"><div class="k">Clock</div><div class="v">7.67<small> MHz</small></div><div class="d">NTSC (7.60 PAL)</div></div>
+            <div class="spec"><div class="k">Registers</div><div class="v">8+8<small> ×32</small></div><div class="d">D0–D7 data · A0–A7 address</div></div>
+            <div class="spec"><div class="k">Data bus</div><div class="v">16<small> bit</small></div><div class="d">32-bit internal, 16-bit external</div></div>
+            <div class="spec"><div class="k">Address bus</div><div class="v">24<small> bit</small></div><div class="d">16 MB address space</div></div>
+            <div class="spec"><div class="k">Work RAM</div><div class="v">64<small> KB</small></div><div class="d">at $FF0000, big-endian</div></div>
+          </div>
+
+          <p>
+            A note on honesty, since it comes up: Sega's &ldquo;<strong>blast
+            processing</strong>&rdquo; was pure marketing. There is no such
+            feature. The phrase gestured, loosely, at the console's ability to
+            push data quickly using the VDP's DMA (Module 10) — genuinely useful,
+            but not a mode you switch on, and not a property of the 68000 at all.
+            When a spec sounds like a slogan, it usually is one. The real 68000 is
+            impressive enough on its facts; the next two modules put it to work.
+          </p>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The Genesis' main CPU is a Motorola 68000 at 7.67 MHz (NTSC) — the same chip behind the Amiga, Atari ST and countless arcade boards.</li>
+              <li>It is 32-bit inside (registers, arithmetic) but talks to memory over a 16-bit data bus, with a 24-bit address bus reaching 16 MB.</li>
+              <li>It is the system master, sharing the board with the Z80 sound CPU, the VDP and the sound chips.</li>
+              <li>&ldquo;Blast processing&rdquo; was a marketing phrase, not a feature — it loosely referred to fast VDP DMA.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#interrupts"><span class="dir">← Prev · Part I</span><span class="ttl">05 · Interrupts &amp; exceptions</span></a>
+            <a class="next" href="#addressing"><span class="dir">Next →</span><span class="ttl">07 · Registers &amp; addressing modes</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 07 --- -->
+      <section class="doc" id="addressing">
+        <div class="mod-head">
+          <span class="eye">Module 07 <span class="part-tag">· Part II</span></span>
+          <h3>The register file &amp; addressing modes</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Master the 68000's defining feature: the many ways an instruction can name where its data lives — the addressing modes that compute an effective address.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            We met the register file in Module 02: eight data registers D0–D7 for
+            arithmetic, eight address registers A0–A7 for pointers, with A7 as the
+            stack pointer. What makes the 68000 a pleasure to program is not the
+            registers themselves but the rich set of ways an instruction can
+            specify <em>where</em> its operand lives. This is the chip's CISC
+            heart (Module 02) on full display. Each way is an
+            <strong>addressing mode</strong>, and every mode boils down to one
+            question the CPU answers before it can act: what is the
+            <span class="term" data-tip="Effective Address — the actual memory address an instruction operates on, computed at run time from the addressing mode, its registers and any constants in the instruction.">effective address</span>
+            (EA) — the real memory location this operand refers to?
+          </p>
+          <p>
+            The simplest modes don't touch memory at all.
+            <strong>Data-register direct</strong> (<code>D3</code>) means &ldquo;the
+            operand <em>is</em> register D3&rdquo;. <strong>Address-register
+            direct</strong> (<code>A2</code>) is the same for an address register.
+            <strong>Immediate</strong> (<code>#42</code>) means the value is a
+            constant baked into the instruction itself. No effective address is
+            computed; the data is right there.
+          </p>
+          <p>
+            The powerful modes use an <em>address register as a pointer</em>.
+            <strong>Register indirect</strong> — written <code>(A1)</code> — means
+            &ldquo;the operand is in memory, at the address held in A1&rdquo;. From
+            that base, four elaborations do most of the heavy lifting in real
+            code:
+          </p>
+          <ul>
+            <li><strong>Post-increment</strong>, <code>(A1)+</code>: use the pointer, <em>then</em> advance it by the operand's size. This is how you sweep forward through an array — the whole of a <code>memcpy</code> is a post-increment read paired with a post-increment write.</li>
+            <li><strong>Pre-decrement</strong>, <code>-(A1)</code>: back the pointer up <em>first</em>, then use it. Pair it with post-increment on another register and you have a stack — which is exactly how A7 pushes and pops (Module 04).</li>
+            <li><strong>Displacement</strong>, <code>16(A1)</code>: add a fixed signed offset baked into the instruction. Perfect for a known field inside a record — &ldquo;the health value is 8 bytes into the player struct&rdquo;.</li>
+            <li><strong>Indexed</strong>, <code>8(A1,D2)</code>: base register <em>plus</em> a variable index register <em>plus</em> a constant. Base = array start, index = element number, constant = field offset — one instruction reaches <code>arr[i].field</code>.</li>
+          </ul>
+          <p>
+            Finally, <strong>absolute</strong> modes (<code>$C00000.L</code>) name
+            a fixed memory address outright, with no register at all — how code
+            reaches the fixed hardware registers we'll map in Module 11. That
+            orthogonality — nearly any mode usable with nearly any instruction —
+            is the 68000's signature, and why hand-written assembly for it reads
+            so cleanly.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Giving someone directions</span>
+            <p>
+              &ldquo;Take <em>this</em> box&rdquo; (immediate — you're holding
+              it). &ldquo;The box at number 12&rdquo; (absolute — a fixed
+              address). &ldquo;The box where your finger is pointing&rdquo;
+              (register indirect — follow the pointer). &ldquo;The box your finger
+              points at — then move your finger to the next one&rdquo;
+              (post-increment). &ldquo;Three doors past where you're pointing&rdquo;
+              (displacement). An
+              <span class="term" data-tip="A rule for computing the effective address of an operand from registers and constants — register direct, indirect, indexed, displacement and more.">addressing mode</span>
+              is just a grammar for saying <em>which</em> box, and the 68000
+              speaks an unusually expressive dialect.
+            </p>
+          </div>
+
+          <p>
+            The lab is the whole register file over a 64-byte memory window. Pick
+            a mode and an address register (and, where the mode uses them, an
+            index register and a displacement), and watch the 68000 compute the
+            effective address the way the silicon does — the arithmetic spelled
+            out, the target byte lit in memory. Start with <code>(An)</code>, then
+            try <code>(An)+</code> and <code>8(An,Dn)</code> to feel how a single
+            operand can reach deep into a data structure.
+          </p>
+
+          <div class="lab" id="lab-addr">
+            <div class="lab-head"><span class="dot"></span><span class="title">Addressing-mode lab — computing the effective address</span><span class="badge">68000 · live</span></div>
+            <div class="lab-body">
+              <div class="am-cols">
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Register file</div>
+                  <div class="am-regs" data-am-regs aria-label="D and A registers"></div>
+                </div>
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Memory · 64 bytes ($00–$3F)</div>
+                  <div class="am-mem" data-am-mem aria-label="Memory bytes"></div>
+                </div>
+              </div>
+              <div class="controls">
+                <div class="ctrl" style="min-width:100%">
+                  <label>Addressing mode</label>
+                  <div class="seg-btns" role="group" aria-label="Addressing mode">
+                    <button data-am-mode="dn">Dn</button>
+                    <button data-am-mode="an">An</button>
+                    <button class="on" data-am-mode="ind">(An)</button>
+                    <button data-am-mode="post">(An)+</button>
+                    <button data-am-mode="pre">-(An)</button>
+                    <button data-am-mode="disp">d(An)</button>
+                    <button data-am-mode="idx">d(An,Dn)</button>
+                    <button data-am-mode="absw">(xxx).W</button>
+                  </div>
+                </div>
+                <div class="ctrl">
+                  <label>Address reg An</label>
+                  <select data-am-an><option value="0">A0</option><option value="1">A1</option><option value="2">A2</option><option value="3">A3</option><option value="4">A4</option><option value="5">A5</option><option value="6">A6</option><option value="7">A7</option></select>
+                </div>
+                <div class="ctrl">
+                  <label>Index reg Dn</label>
+                  <select data-am-xn><option value="0">D0</option><option value="1">D1</option><option value="2">D2</option><option value="3">D3</option></select>
+                </div>
+                <div class="ctrl">
+                  <label>Displacement — <span class="val" data-am-disp-val>0</span></label>
+                  <input type="range" min="-8" max="24" value="4" step="1" data-am-disp aria-label="Displacement">
+                </div>
+              </div>
+              <div class="float-read">
+                <div class="fr"><span class="k">Computation</span><span class="v" data-am-formula>—</span></div>
+                <div class="fr"><span class="k">Effective address</span><span class="v" data-am-ea>—</span></div>
+                <div class="fr"><span class="k">Operand at EA</span><span class="v" data-am-val>—</span></div>
+                <div class="fr"><span class="k">Note</span><span class="v" data-am-note>—</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>An addressing mode is a rule for computing an operand's effective address before the instruction acts.</li>
+              <li>Direct and immediate modes touch no memory; register-indirect modes follow an address register as a pointer.</li>
+              <li>Post-increment/pre-decrement walk arrays and build stacks; displacement and indexed modes reach fields inside structures.</li>
+              <li>The 68000's orthogonality — most modes with most instructions — is what makes its assembly so expressive.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#m68k"><span class="dir">← Prev</span><span class="ttl">06 · Meet the Motorola 68000</span></a>
+            <a class="next" href="#isa68k"><span class="dir">Next →</span><span class="ttl">08 · The instruction set in practice</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 08 --- -->
+      <section class="doc" id="isa68k">
+        <div class="mod-head">
+          <span class="eye">Module 08 <span class="part-tag">· Part II</span></span>
+          <h3>The 68000 instruction set in practice</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Read and write real 68000 assembly: the core instructions, size suffixes, and — the heart of it — how each one sets the condition-code flags X N Z V C.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            With registers (Module 02) and addressing modes (Module 07) in hand,
+            the instruction set almost falls out. The 68000 has a famously
+            regular, human-readable assembly language built from a modest number
+            of operation families. <code>MOVE</code> copies data — from anywhere
+            to anywhere the addressing modes allow — and is by far the most
+            common instruction. <code>ADD</code>, <code>SUB</code>,
+            <code>MULS</code>, <code>DIVS</code> do arithmetic;
+            <code>AND</code>, <code>OR</code>, <code>EOR</code>, <code>NOT</code>
+            do bitwise logic; <code>CMP</code> compares; <code>Bcc</code> and
+            <code>BSR</code> branch (Module 04). Most take a
+            <strong>size suffix</strong> — <code>.b</code>, <code>.w</code> or
+            <code>.l</code> (Module 03) — so <code>ADD.W</code> works on 16 bits
+            and <code>ADD.L</code> on 32. There are handy shortcuts too:
+            <code>MOVEQ</code> loads a small constant fast, <code>ADDQ</code>/
+            <code>SUBQ</code> add or subtract a small number, and
+            <code>DBRA</code> decrements a register and loops in a single
+            instruction — the 68000's built-in for-loop.
+          </p>
+          <p>
+            The subtle, essential part is the <strong>condition-code
+            register</strong> (<span class="term" data-tip="The low byte of the 68000 status register, holding five flags — X N Z V C — that record properties of the last operation's result, and which conditional branches test.">CCR</span>).
+            Almost every arithmetic and data instruction leaves a fingerprint in
+            five flags, and conditional branches read them. The 68000's five, in
+            the order they sit in the register:
+          </p>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Flag</th><th>Name</th><th>Set when…</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pill hb">X</span></td><td>Extend</td><td>A second copy of carry, kept for multi-precision arithmetic (<code>ADDX</code>). Unlike C, it isn't disturbed by every instruction — <code>MOVE</code> and <code>CMP</code> leave it alone.</td></tr>
+                <tr><td><span class="pill axwii">N</span></td><td>Negative</td><td>The result's most-significant bit is 1 — i.e. the value is negative in two's complement (Module 03).</td></tr>
+                <tr><td><span class="pill ax">Z</span></td><td>Zero</td><td>The result was exactly zero. This is what <code>BEQ</code>/<code>BNE</code> test.</td></tr>
+                <tr><td><span class="pill zelda">V</span></td><td>Overflow</td><td>The signed result didn't fit — e.g. adding two positives gave a &ldquo;negative&rdquo;. Two's-complement wrap, caught.</td></tr>
+                <tr><td><span class="pill hb">C</span></td><td>Carry</td><td>An unsigned carry out of (or borrow into) the top bit.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            The reason two flags exist for what looks like the same thing —
+            V&nbsp;(signed overflow) and C&nbsp;(unsigned carry) — is that the CPU
+            genuinely doesn't know whether your bytes are signed or unsigned
+            (Module 03 again). It computes <em>both</em> interpretations' error
+            conditions every time, and your choice of conditional branch
+            (<code>BCS</code> reads carry, <code>BVS</code> reads overflow,
+            <code>BLT</code> combines N and V for signed &ldquo;less than&rdquo;)
+            picks which one you meant. That is the whole trick of writing correct
+            comparisons on this chip.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The margin notes on a sum</span>
+            <p>
+              A careful bookkeeper doesn't just write the total of a column — they
+              scribble tiny notes in the margin: &ldquo;came to zero&rdquo;,
+              &ldquo;went negative&rdquo;, &ldquo;carried a digit&rdquo;,
+              &ldquo;this overflowed the box&rdquo;. Later, when deciding what to
+              do next, they read the margin, not the whole sum again. The
+              <span class="term" data-tip="The X N Z V C flags — five one-bit margin notes the 68000 writes after most operations, and which branches consult.">CCR flags</span>
+              are those margin notes, and a conditional branch is the bookkeeper
+              glancing at one of them.
+            </p>
+          </div>
+
+          <p>
+            Enough theory — let's assemble and run some. The lab below is a
+            genuine, if small, 68000 assembler and stepper written in JavaScript.
+            It supports <code>MOVE</code>, <code>MOVEQ</code>, <code>ADD</code>/
+            <code>ADDQ</code>, <code>SUB</code>/<code>SUBQ</code>,
+            <code>CMP</code>, <code>TST</code>, <code>CLR</code>, the logic
+            instructions, <code>Bcc</code>/<code>BRA</code> and <code>DBRA</code>,
+            over D0–D7, A0–A7 and a small memory, computing the flags
+            <em>size-correctly</em>. The default program sums 1…5 with a
+            <code>DBRA</code>-style loop and stores the result to memory. Press
+            <strong>Assemble</strong>, then <strong>Step</strong> and watch the
+            registers change and — the point of the whole module — the
+            <strong>X N Z V C</strong> lights react on every instruction. Then
+            edit the code and run your own.
+          </p>
+
+          <div class="lab" id="lab-asm">
+            <div class="lab-head"><span class="dot"></span><span class="title">68000 assembler lab — MOVE / ADD / SUB / branch, live flags</span><span class="badge">assembler + stepper · live</span></div>
+            <div class="lab-body">
+              <div class="asm-grid">
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Source (editable)</div>
+<textarea class="asm-src" data-asm-src spellcheck="false" aria-label="68000 assembly source">    move.l  #0,d0        ; running total
+    move.l  #5,d1        ; counter n = 5
+loop:
+    add.l   d1,d0        ; total += n
+    subq.l  #1,d1        ; n = n - 1
+    bne     loop         ; loop until n hits 0 (Z set)
+    move.l  d0,(a0)      ; store the sum (15) to memory at A0
+    tst.l   d0           ; set N/Z from the result
+    nop</textarea>
+                  <div class="lab-sub" style="margin:12px 0 8px">Listing (current line highlighted)</div>
+                  <div class="asm-listing" data-asm-listing></div>
+                </div>
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Registers</div>
+                  <div class="asm-regs" data-asm-regs></div>
+                  <div class="lab-sub" style="margin:12px 0 8px">Condition codes (CCR)</div>
+                  <div class="ccr" data-asm-ccr aria-label="Condition code flags"></div>
+                  <div class="lab-sub" style="margin:12px 0 8px">Memory · 32 bytes ($00–$1F)</div>
+                  <div class="am-mem" data-asm-mem aria-label="Assembler memory"></div>
+                  <div class="tc-narrate" data-asm-narrate aria-live="polite" style="margin-top:12px">Press <b>Assemble</b>, then <b>Step</b>.</div>
+                </div>
+              </div>
+              <div class="controls">
+                <button class="play-btn" data-asm-assemble>Assemble</button>
+                <button class="play-btn" data-asm-step style="background:linear-gradient(180deg,var(--gold),#d9a02f);color:#170a00">Step</button>
+                <button class="play-btn" data-asm-run style="background:linear-gradient(180deg,var(--red),var(--red-d));color:#170a08">Run</button>
+                <span style="font-size:12.5px;color:var(--muted)">A0 starts at $10. Watch <b>Z</b> light when the counter hits 0, then <code>bne</code> falls through.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li><code>MOVE</code> dominates; arithmetic, logic, compare and branch families do the rest, most taking a .b/.w/.l size suffix.</li>
+              <li>Shortcuts like <code>MOVEQ</code>, <code>ADDQ</code> and <code>DBRA</code> make common patterns one instruction.</li>
+              <li>The CCR's five flags — X N Z V C — record the last result; conditional branches read them.</li>
+              <li>V (signed overflow) and C (unsigned carry) both exist because the CPU computes both interpretations; your branch choice picks which.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#addressing"><span class="dir">← Prev</span><span class="ttl">07 · Registers &amp; addressing modes</span></a>
+            <a class="next" href="#z80"><span class="dir">Next →</span><span class="ttl">09 · The Z80 sound CPU</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 09 --- -->
+      <section class="doc" id="z80">
+        <div class="mod-head">
+          <span class="eye">Module 09 <span class="part-tag">· Part II</span></span>
+          <h3>The Z80 sound CPU</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the console's second brain: the 8-bit Zilog Z80, why the Genesis has two CPUs at all, and how it drives the sound chips.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The Genesis has a <em>second</em> processor, and it is a much older,
+            humbler one: the <strong>Zilog Z80</strong>, an 8-bit CPU from 1976
+            that powered the ZX Spectrum, countless arcade machines — and Sega's
+            own previous console, the Master System. It runs at
+            <strong>3.58&nbsp;MHz</strong> with its own private
+            <strong>8&nbsp;KB of RAM</strong>, entirely separate from the 68000's
+            work RAM. Its job on the Genesis is sound: it runs the
+            <em>sound driver</em>, a small program that reads music and
+            sound-effect data and pokes the two audio chips — the
+            <span class="term" data-tip="Yamaha YM2612 (OPN2): six channels of four-operator FM synthesis — the source of the Genesis' distinctive lead and bass sounds.">YM2612</span>
+            FM synthesiser and the SN76489 PSG — at exactly the right moments.
+          </p>
+          <p>
+            Why a whole second CPU just for sound? Two reasons, one practical, one
+            historical. Practically, sound is <em>relentless</em>: FM channels need
+            their envelopes and note changes serviced hundreds of times a second,
+            on a tight schedule, and doing that on the 68000 would steal cycles
+            from the game at the worst moments. Offloading it to a dedicated chip
+            keeps the music rock-steady no matter how busy the game logic gets.
+            Historically, the Z80 was <em>already there</em>: including it let the
+            Mega Drive play Master System games with an adapter, since a Master
+            System is essentially a Z80 plus a video chip. Sega got backward
+            compatibility and a free sound coprocessor from one decision.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The house band</span>
+            <p>
+              A busy restaurant kitchen (the 68000) can't also play live music —
+              it's flat out cooking. So the restaurant hires a small house band
+              (the Z80) that reads its own sheet music and plays without needing
+              the chef's attention. Now and then the chef sends over a note —
+              &ldquo;play the victory fanfare&rdquo; — but the band handles the
+              tempo, the notes, the timing entirely itself. The
+              <span class="term" data-tip="A small program run by the Z80 that interprets music/SFX data and writes to the sound chips on schedule, freeing the 68000.">sound driver</span>
+              is the band's sheet music; the 68000 just occasionally requests a
+              song.
+            </p>
+          </div>
+
+          <p>
+            The two CPUs are only loosely coupled, and that coupling is the
+            interesting engineering. The 68000 is the master: it can
+            <strong>reset</strong> the Z80, <strong>halt</strong> it, and — the
+            key mechanism — <strong>request the Z80's bus</strong> so it can reach
+            into the Z80's RAM and the sound chips directly, for example to upload
+            a new sound driver or trigger music. While the 68000 holds that bus,
+            the Z80 is frozen. Getting this handshake right (and knowing exactly
+            how many cycles the Z80 loses to it) is a real concern for both game
+            programmers and emulator authors — it is the heart of the bus
+            arbitration we build a lab for in the very next module. There is also
+            a hardware wrinkle famous among developers: reaching the YM2612's
+            registers from the 68000 side works, but the sanctioned path is
+            through the Z80, and mishandling the bus timing can drop writes.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 250" role="img" aria-label="The Z80 with its own RAM drives the two sound chips; the 68000 can request its bus">
+              <defs><marker id="m9a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker><marker id="m9c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#3fb5ff"/></marker></defs>
+              <rect x="30" y="90" width="160" height="80" rx="12" class="d-fill-ground d-violet-s" stroke-width="1.5"/>
+              <text x="110" y="122" text-anchor="middle" class="d-label" style="font-size:13px">68000</text>
+              <text x="110" y="142" text-anchor="middle" class="d-sub">master</text>
+              <path d="M 190 130 C 230 130, 240 130, 276 130" fill="none" stroke="#7e8599" stroke-width="1.8" marker-end="url(#m9a)"/>
+              <text x="234" y="118" text-anchor="middle" class="d-flow">BUSREQ / RESET</text>
+              <rect x="280" y="80" width="180" height="100" rx="12" class="d-fill-ground d-cyan-s" stroke-width="1.6"/>
+              <text x="370" y="112" text-anchor="middle" class="d-label" style="font-size:13px">Zilog Z80</text>
+              <text x="370" y="132" text-anchor="middle" class="d-sub">3.58 MHz</text>
+              <text x="370" y="152" text-anchor="middle" class="d-sub">runs sound driver</text>
+              <rect x="280" y="196" width="180" height="34" rx="8" class="d-fill-panel d-cyan-s" stroke-width="1.3"/>
+              <text x="370" y="218" text-anchor="middle" class="d-sub">private 8 KB RAM</text>
+              <line x1="370" y1="180" x2="370" y2="194" class="d-axis" stroke-width="1.5" marker-end="url(#m9c)"/>
+              <path d="M 460 110 C 500 104, 510 100, 546 98" fill="none" stroke="#3fb5ff" stroke-width="1.8" marker-end="url(#m9c)"/>
+              <path d="M 460 150 C 500 156, 510 160, 546 162" fill="none" stroke="#3fb5ff" stroke-width="1.8" marker-end="url(#m9c)"/>
+              <rect x="550" y="72" width="180" height="60" rx="10" class="d-fill-panel2 d-magenta-s" stroke-width="1.5"/>
+              <text x="640" y="98" text-anchor="middle" class="d-label" style="font-size:12.5px">YM2612 (FM)</text>
+              <text x="640" y="116" text-anchor="middle" class="d-sub">6 channels · 4-op</text>
+              <rect x="550" y="142" width="180" height="60" rx="10" class="d-fill-panel2 d-amber-s" stroke-width="1.5"/>
+              <text x="640" y="168" text-anchor="middle" class="d-label" style="font-size:12.5px">SN76489 (PSG)</text>
+              <text x="640" y="186" text-anchor="middle" class="d-sub">3 square + noise</text>
+              <path d="M 730 132 C 780 132, 790 132, 820 132" fill="none" stroke="#7e8599" stroke-width="1.8" marker-end="url(#m9a)"/>
+              <text x="800" y="120" text-anchor="middle" class="d-flow">🔊</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The house band.</strong> The Z80 runs its sound driver from private RAM and writes the FM and PSG chips on schedule. The 68000 stays out of the way, only occasionally halting the Z80 (via <span class="term" data-tip="Bus request — the 68000 asks to take over the Z80's bus so it can reach the Z80 RAM and sound chips; the Z80 freezes until released.">BUSREQ</span>) to reach across. Both sound chips get a full companion course.</figcaption>
+          </figure>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The Genesis' second CPU is a Zilog Z80 at 3.58 MHz with its own private 8 KB RAM.</li>
+              <li>It runs the sound driver, servicing the YM2612 FM chip and SN76489 PSG so the 68000 doesn't have to.</li>
+              <li>Including it also gave the Mega Drive Master System backward compatibility (a Master System is essentially a Z80 + video chip).</li>
+              <li>The 68000 masters it — reset, halt, and bus-request to reach the Z80's RAM and the sound chips directly.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#isa68k"><span class="dir">← Prev</span><span class="ttl">08 · The instruction set in practice</span></a>
+            <a class="next" href="#bus"><span class="dir">Next →</span><span class="ttl">10 · Sharing the bus</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 10 --- -->
+      <section class="doc" id="bus">
+        <div class="mod-head">
+          <span class="eye">Module 10 <span class="part-tag">· Part II</span></span>
+          <h3>Sharing the bus: 68000 / Z80 / VDP DMA</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how three masters — the 68000, the Z80 and the VDP's DMA engine — take turns on shared buses, and why that arbitration is where cycles quietly vanish.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A bus is just a shared bundle of wires — address lines, data lines,
+            control lines — that connects a CPU to memory and devices. The
+            trouble is that a bus can serve only one master at a time, and the
+            Genesis has <em>several</em> things that want to be master. This is
+            <span class="term" data-tip="The mechanism that decides which device controls a shared bus at each moment, and makes the others wait their turn.">bus arbitration</span>,
+            and on the Genesis it's a three-way negotiation whose outcome shapes
+            performance in ways that don't show up on any spec sheet.
+          </p>
+          <p>
+            The most important sharing is between the 68000 and the
+            <strong>VDP</strong>, the video chip. Both need the path to memory,
+            and the VDP has a trick that makes it greedy: <strong>DMA</strong>
+            (<span class="term" data-tip="Direct Memory Access — a hardware engine that copies blocks of data by itself, without the CPU running load/store instructions. On the Genesis the VDP has one, used to fill video memory fast.">Direct Memory Access</span>).
+            When a game wants to blast a big chunk of graphics into video RAM — a
+            new level's tiles, a full palette, a screen's worth of scrolling data —
+            it programs the VDP's DMA engine to copy it, and the engine does so by
+            itself, fast. But while a DMA runs, it <em>holds the bus</em>, and the
+            68000 is frozen for the duration: every DMA cycle is a 68000 cycle
+            stolen. (This, and only this, was the seed of the &ldquo;blast
+            processing&rdquo; slogan from Module 06 — fast DMA fills, dressed up.)
+          </p>
+          <p>
+            The <em>timing</em> of a DMA matters enormously. During
+            <strong>vertical blank</strong> — the brief window each frame when the
+            electron beam is off-screen and the VDP isn't drawing — DMA runs at
+            full speed and the stolen 68000 cycles are &ldquo;free&rdquo;, because
+            the CPU had little useful video work to do anyway. But a DMA during
+            <em>active display</em>, mid-frame, competes with the VDP's own screen
+            fetches and steals cycles the game may badly want. Skilled Genesis
+            programmers schedule their big transfers into vblank almost
+            religiously, for exactly this reason.
+          </p>
+          <p>
+            The third master is the <strong>Z80</strong> (Module 09). Most of the
+            time it minds its own bus, but when the 68000 asserts
+            <code>BUSREQ</code> to reach the sound chips, the Z80 stalls until
+            released. So the full picture is a rotating handshake: the 68000 runs,
+            until the VDP steals the main bus for a DMA; the Z80 runs on its own
+            clock, until the 68000 borrows it. Everyone gets a turn; nobody gets
+            all of it.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The single-track railway</span>
+            <p>
+              Three trains, one shared stretch of track. A signaller lets one
+              through at a time and holds the others at a red light. The express
+              (the VDP's DMA) gets priority when it runs, and everything else
+              waits; the local (the 68000) makes good progress until the express
+              is scheduled; a branch-line service (the Z80) mostly runs elsewhere
+              but occasionally needs the shared stretch too. Nothing is <em>lost</em>
+              — but total throughput depends entirely on how cleverly the timetable
+              packs the express runs into the gaps. That timetable is a Genesis
+              programmer's real craft.
+            </p>
+          </div>
+
+          <p>
+            The lab is that timetable, for one frame. The top lane is the 68000
+            trying to execute; the middle lane is the VDP's DMA — scattered small
+            transfers during active display plus one big fill in vertical blank;
+            the bottom lane is the Z80. Drag the <strong>DMA size</strong> up and
+            watch the 68000's red stall slices grow — and read off how much of the
+            frame the CPU spent frozen. Toggle the <strong>Z80 bus request</strong>
+            to see the Z80 lane stall when the 68000 reaches across. Replay it a
+            few times; the finish moves with the DMA load.
+          </p>
+
+          <div class="lab" id="lab-bus">
+            <div class="lab-head"><span class="dot"></span><span class="title">Bus-arbitration lab — one frame, three masters</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <canvas class="bus-canvas" aria-label="Timeline of 68000 execution, VDP DMA and Z80 activity across one frame"></canvas>
+              <div class="stat-row">
+                <span class="stat-chip">68000 work <b data-bus-work>—</b></span>
+                <span class="stat-chip warn">68000 frozen by DMA <b data-bus-stall>—</b></span>
+                <span class="stat-chip">frame length <b data-bus-total>—</b></span>
+              </div>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>VDP DMA size — <span class="val" data-bus-dma-val>40 cyc</span></label>
+                  <input type="range" min="10" max="90" value="40" step="5" data-bus-dma aria-label="DMA burst size">
+                </div>
+                <div class="ctrl">
+                  <label>68000 → Z80 bus request</label>
+                  <div class="seg-btns" role="group" aria-label="Z80 bus request">
+                    <button class="on" data-bus-z80="off">off</button>
+                    <button data-bus-z80="on">on — halt the Z80</button>
+                  </div>
+                </div>
+                <button class="play-btn" data-bus-run>Replay frame</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A bus serves one master at a time; the Genesis has three that want it — the 68000, the VDP DMA engine, and the Z80.</li>
+              <li>VDP DMA holds the main bus and freezes the 68000 while it runs — fast fills bought with stolen CPU cycles.</li>
+              <li>DMA in vertical blank is nearly free; DMA during active display steals cycles the game wants — so programmers schedule it into vblank.</li>
+              <li>The 68000 can also halt the Z80 via BUSREQ to reach the sound chips; arbitration is a constant rotating handshake.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#z80"><span class="dir">← Prev</span><span class="ttl">09 · The Z80 sound CPU</span></a>
+            <a class="next" href="#memmap"><span class="dir">Next →</span><span class="ttl">11 · The memory map</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 11 --- -->
+      <section class="doc" id="memmap">
+        <div class="mod-head">
+          <span class="eye">Module 11 <span class="part-tag">· Part II</span></span>
+          <h3>The memory map</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn how the 68000's 16 MB address space is carved up — ROM, RAM, the Z80, I/O and the VDP — and how a few address bits pick which device answers.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The 68000 has 24 address bits, so it can name any of 16&nbsp;million
+            byte addresses (Module 06). But the Genesis has nowhere near 16 MB of
+            anything — a few megabytes of cartridge ROM, 64 KB of work RAM, a
+            handful of hardware registers. So most of that vast address space is
+            empty, and the parts that aren't are scattered across it at fixed
+            landmarks. That layout is the <strong>memory map</strong>, and knowing
+            it is knowing the console: every act a program takes is a read or write
+            to <em>some</em> address in this map.
+          </p>
+          <p>
+            How does a single address reach the right chip? Through
+            <span class="term" data-tip="The hardware logic that inspects the top address bits and enables exactly one device — ROM, RAM, VDP, etc. — for a given address. It's why each device 'lives' at a fixed range.">address decoding</span>.
+            Simple logic on the console's board watches the top few address lines
+            and switches on exactly one device for any given address. Because the
+            decoding usually only looks at the <em>high</em> bits, each device
+            actually answers across a big block — and often <strong>mirrors</strong>,
+            appearing repeatedly, because the low bits within its block are
+            ignored by the decoder. That's why the 64 KB of work RAM answers all
+            across the top 2 MB of the map, and why the canonical &ldquo;correct&rdquo;
+            address is a convention, not the only one that works.
+          </p>
+          <p>
+            The landmarks every Genesis programmer memorises: the cartridge
+            <strong>ROM</strong> lives at the very bottom, from
+            <code>$000000</code> — which is why the 68000's reset vectors (Module
+            05) point straight into the cart, so the console boots the game's code.
+            The <strong>Z80's</strong> world sits at <code>$A00000</code>, the
+            <strong>I/O ports</strong> (controllers, region) at <code>$A10000</code>,
+            the Z80 <strong>bus-control</strong> registers just above at
+            <code>$A11100</code>, the <strong>VDP</strong> at <code>$C00000</code>,
+            and the 68000's <strong>work RAM</strong> up at the top, canonically
+            <code>$FF0000</code>. (Somewhere near <code>$000100</code> in the ROM
+            sits the cartridge header — the ASCII string &ldquo;SEGA MEGA
+            DRIVE&rdquo; or &ldquo;SEGA GENESIS&rdquo; that later consoles' TMSS
+            check reads; that story belongs to the cartridge course.)
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A city's postal districts</span>
+            <p>
+              A postal sorter doesn't read the whole address to route a letter —
+              the first digit or two of the postcode already says which district,
+              and that's enough to drop it in the right sack. The
+              <span class="term" data-tip="Logic that reads the top address bits to choose a device — the postcode-district of the memory map.">address decoder</span>
+              is that sorter, reading only the high address bits; the districts are
+              ROM, RAM, the VDP and so on. And just as a small village might be
+              reachable by several near-identical postcodes, a device that ignores
+              its low address bits appears <em>mirrored</em> many times across its
+              block.
+            </p>
+          </div>
+
+          <p>
+            The lab is an interactive decoder. Type a 24-bit address, drag the
+            slider across the whole 16 MB space, or click a landmark — and watch
+            which device answers, with the address shown in hex and binary so you
+            can see the top bits doing the selecting. Click through
+            <code>$000004</code> (the reset PC), <code>$C00000</code> (the VDP data
+            port) and <code>$FF0000</code> (work RAM) to walk the map a program
+            actually uses.
+          </p>
+
+          <div class="lab" id="lab-memmap">
+            <div class="lab-head"><span class="dot"></span><span class="title">Memory-map lab — decode a 24-bit address</span><span class="badge">68000 · live</span></div>
+            <div class="lab-body">
+              <div class="mm-bar" data-mm-bar aria-label="The 16 MB address space, by device"></div>
+              <div class="mm-scale"><span>$000000</span><span>16 MB address space →</span><span>$FFFFFF</span></div>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Address (hex)</label>
+                  <input type="text" data-mm-input value="000004" spellcheck="false" style="font:600 14px/1 var(--mono);background:var(--panel-3);color:var(--ink);border:1px solid var(--line-2);border-radius:8px;padding:9px 11px;width:120px">
+                </div>
+                <div class="ctrl" style="flex:1;min-width:200px">
+                  <label>…or slide across the space</label>
+                  <input type="range" min="0" max="16777215" value="4" step="1" data-mm-slider aria-label="Address">
+                </div>
+                <div class="ctrl" style="min-width:100%">
+                  <label>Landmarks</label>
+                  <div class="seg-btns" role="group" aria-label="Address landmarks">
+                    <button data-mm-preset="000004">ROM reset PC</button>
+                    <button data-mm-preset="000100">cart header</button>
+                    <button data-mm-preset="A00000">Z80</button>
+                    <button data-mm-preset="A10001">I/O pad</button>
+                    <button data-mm-preset="A11100">Z80 bus ctrl</button>
+                    <button data-mm-preset="C00000">VDP data</button>
+                    <button data-mm-preset="C00004">VDP ctrl</button>
+                    <button data-mm-preset="FF0000">work RAM</button>
+                  </div>
+                </div>
+              </div>
+              <div class="float-read">
+                <div class="fr"><span class="k">Address</span><span class="v" data-mm-hex>—</span></div>
+                <div class="fr"><span class="k">Binary (24-bit)</span><span class="v" data-mm-bin>—</span></div>
+                <div class="fr"><span class="k">Region</span><span class="v" data-mm-region>—</span></div>
+                <div class="fr"><span class="k">Device</span><span class="v" data-mm-device>—</span></div>
+                <div class="fr"><span class="k">What it is</span><span class="v" data-mm-note>—</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The 68000's 16 MB space is mostly empty; real devices sit at fixed landmarks within it.</li>
+              <li>Address decoding watches the top bits to enable one device — so devices answer across whole blocks and often mirror.</li>
+              <li>ROM at $000000 (with the reset vectors), Z80 at $A00000, I/O at $A10000, VDP at $C00000, work RAM at $FF0000.</li>
+              <li>Booting works because the reset vectors at the bottom of the map point straight into the cartridge ROM.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#bus"><span class="dir">← Prev</span><span class="ttl">10 · Sharing the bus</span></a>
+            <a class="next" href="#gen-int"><span class="dir">Next →</span><span class="ttl">12 · Interrupts on the Genesis</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 12 --- -->
+      <section class="doc" id="gen-int">
+        <div class="mod-head">
+          <span class="eye">Module 12 <span class="part-tag">· Part II</span></span>
+          <h3>Interrupts on the Genesis</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how the VDP drives the 68000's two key interrupts — VBlank at level 6 and HBlank at level 4 — and how the line counter turns HBlank into mid-screen raster effects.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Module 05 built the general machinery of interrupts. Now we wire it to
+            the television, because on a games console <em>the screen is the
+            clock</em>. A TV draws the picture one horizontal line at a time, top
+            to bottom, then flies the beam back to the top and starts again — 60
+            times a second on NTSC (224 visible lines), 50 on PAL (240 lines). The
+            VDP knows exactly where the beam is at every instant, and it uses that
+            knowledge to interrupt the 68000 at two precise moments.
+          </p>
+          <p>
+            The first is <strong>vertical blank</strong> (VBlank), raised at
+            <span class="term" data-tip="Interrupt priority level 6 — the Genesis wires the VDP's vertical-blank interrupt here, so it can preempt almost anything except a level-7 non-maskable interrupt.">level&nbsp;6</span>,
+            once per frame, the instant the beam finishes the last visible line and
+            begins its trip back to the top. This is the game's heartbeat. The
+            VBlank handler is where a game does everything that must happen exactly
+            once per frame and must <em>not</em> tear the picture: update the
+            scroll positions, upload the frame's new sprites and graphics via DMA
+            (Module 10 — this is why DMA belongs in vblank), read the controllers,
+            advance the music tick. Miss your VBlank budget and the frame drops;
+            hit it every time and the game runs at a locked, smooth 60.
+          </p>
+          <p>
+            The second is subtler and is the source of the Genesis' signature
+            visual tricks: the <strong>horizontal blank</strong> (HBlank)
+            interrupt at <span class="term" data-tip="Interrupt priority level 4 — the Genesis wires the VDP's horizontal-blank interrupt here, below VBlank, so a VBlank can still preempt a mid-screen raster routine.">level&nbsp;4</span>.
+            It can fire in the tiny gap <em>between</em> visible scanlines, mid-
+            frame — but firing on every one of 224 lines would drown the CPU, so
+            the VDP has a programmable
+            <span class="term" data-tip="A VDP register (register 10) holding how many scanlines to wait between HBlank interrupts. Set it to N and the interrupt fires every N+1 lines, letting a game act on chosen rows.">line counter</span>:
+            you tell it &ldquo;interrupt me every N lines&rdquo;, and it counts
+            them down for you. Because the handler runs <em>partway down the
+            screen</em>, it can change VDP settings that take effect for the lines
+            <em>below</em> it — and that is how you get effects that were pure
+            magic in 1990.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Repainting the set between rows of seats</span>
+            <p>
+              Picture a stage crew repainting a backdrop while the audience files
+              in row by row. They can't repaint the rows already seated — but the
+              moment a row fills, they can change everything for the rows still
+              empty below. The TV beam is the filling audience, drawing top to
+              bottom; the
+              <span class="term" data-tip="Firing an interrupt on a chosen scanline to change video settings for the lines drawn afterwards — the basis of split screens, scrolling status bars and gradient skies.">HBlank interrupt</span>
+              is the cue to the crew between rows. Change the scroll offset there
+              and the bottom of the screen scrolls independently of the top — a
+              locked status bar over a moving playfield. Change the background
+              colour and you paint a gradient sky one band at a time.
+            </p>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 300" role="img" aria-label="The TV beam scans top to bottom; an HBlank interrupt mid-screen changes scroll for the lines below, and VBlank fires once at the bottom">
+              <defs><marker id="mCg" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker></defs>
+              <rect x="60" y="30" width="360" height="240" rx="8" class="d-fill-ground d-stroke-line" stroke-width="1.5"/>
+              <!-- top region scrolling one way -->
+              <rect x="66" y="36" width="348" height="96" rx="4" class="d-fill-panel d-cyan-s" stroke-width="1.2"/>
+              <text x="240" y="88" text-anchor="middle" class="d-sub">playfield · scrolls left</text>
+              <!-- HBlank line -->
+              <line x1="60" y1="150" x2="420" y2="150" stroke="#ff5347" stroke-width="2.5" stroke-dasharray="6 4"/>
+              <text x="240" y="146" text-anchor="middle" class="d-flow d-violet">HBlank IRQ (level 4) fires on this line →</text>
+              <!-- bottom region -->
+              <rect x="66" y="156" width="348" height="108" rx="4" class="d-fill-panel d-amber-s" stroke-width="1.2"/>
+              <text x="240" y="214" text-anchor="middle" class="d-sub">status bar · held still (different scroll)</text>
+              <!-- beam arrow -->
+              <line x1="40" y1="36" x2="40" y2="264" class="d-axis" stroke-width="1.6" marker-end="url(#mCg)"/>
+              <text x="30" y="150" text-anchor="middle" class="d-flow" transform="rotate(-90 30 150)">beam scans top → bottom</text>
+              <!-- VBlank -->
+              <line x1="420" y1="270" x2="520" y2="285" class="d-axis" stroke-width="1.6" marker-end="url(#mCg)"/>
+              <rect x="520" y="250" width="340" height="44" rx="9" class="d-fill-panel d-violet-s" stroke-width="1.4"/>
+              <text x="690" y="270" text-anchor="middle" class="d-label" style="font-size:12px">VBlank IRQ (level 6) — once per frame</text>
+              <text x="690" y="286" text-anchor="middle" class="d-sub">scroll · sprites · DMA · controllers · music</text>
+              <!-- line counter note -->
+              <rect x="520" y="40" width="340" height="180" rx="10" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="540" y="66" class="d-tag">The line counter</text>
+              <text x="540" y="92" class="d-sub">VDP reg 10 = N</text>
+              <text x="540" y="114" class="d-sub">→ interrupt every N+1 visible lines</text>
+              <text x="540" y="146" class="d-sub">Handler changes VDP state for the</text>
+              <text x="540" y="164" class="d-sub">lines drawn <tspan class="d-violet">after</tspan> it:</text>
+              <text x="540" y="190" class="d-sub">• split-screen scroll</text>
+              <text x="540" y="208" class="d-sub">• gradient skies · water lines</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The screen as a clock.</strong> The VDP raises HBlank (level 4) on a chosen scanline via the <span class="term" data-tip="VDP register 10 — how many lines to count between HBlank interrupts.">line counter</span>, letting the handler change scroll or colour for the lines below; VBlank (level 6) fires once at the bottom for the per-frame housekeeping. VBlank outranks HBlank, so a frame update can still preempt a raster routine.</figcaption>
+          </figure>
+
+          <p>
+            The priority ordering is deliberate: VBlank at 6 sits above HBlank at
+            4, so the once-a-frame heartbeat can always preempt a mid-screen raster
+            routine, but not vice-versa. Everything you'll see praised about
+            Genesis graphics — the parallax hills, the heat-haze, the reflective
+            water that ripples along a single line, the interface bars welded to a
+            scrolling world — is, underneath, some programmer's HBlank handler
+            firing on exactly the right line and rewriting a VDP register in the
+            few microseconds before the beam moves on. It is Module 05's shoulder-
+            tap, aimed with a stopwatch.
+          </p>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>On a console the screen is the clock: the VDP interrupts the 68000 based on where the TV beam is.</li>
+              <li>VBlank (level 6) fires once per frame at the bottom — the game's heartbeat for scroll, sprites, DMA, input and music.</li>
+              <li>HBlank (level 4) can fire mid-frame; a programmable line counter chooses which scanlines trigger it.</li>
+              <li>Changing VDP state in an HBlank handler affects the lines below it — the basis of split-screens and raster effects.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#memmap"><span class="dir">← Prev</span><span class="ttl">11 · The memory map</span></a>
+            <a class="next" href="#emu"><span class="dir">Next → Part III</span><span class="ttl">13 · Interpreters vs recompilers</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART III ============ -->
+      <section class="part" id="part-3">
+        <div class="part-inner">
+          <div class="kicker">Part III</div>
+          <h3>Emulating in Genesis Plus GX &amp; BlastEm</h3>
+          <p>
+            Finally: how does software on your PC stand in for all of this? Your
+            processor speaks x86-64 or ARM64 — it cannot run a single 68000
+            instruction. An emulator must translate. But the Genesis makes the
+            problem richer than a single CPU: there are <em>two</em> CPUs plus a
+            video chip, all running on their own clocks, and the emulator must keep
+            them in step. These three modules cover the translation machinery, the
+            scheduling and timing traps where accuracy is won or lost, and the
+            settings in real emulators — <strong>Genesis Plus GX</strong>,
+            <strong>BlastEm</strong> and (for the FM chip) <strong>Nuked-OPN2</strong> —
+            that map to everything you've learned.
+          </p>
+          <div class="part-meta"><span>Modules <b>13–15</b></span><span>Difficulty <b>Emulation</b></span><span>Labs <b>1 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 13 --- -->
+      <section class="doc" id="emu">
+        <div class="mod-head">
+          <span class="eye">Module 13 <span class="part-tag">· Part III</span></span>
+          <h3>Interpreters vs recompilers: running two CPUs</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand the two ways to run one CPU's code on another — re-decode every instruction, or translate blocks once — and why Genesis emulators mostly, and deliberately, choose the slower one.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Strip the problem to its core: an emulator holds the game's memory in
+            a big array, and in that array sit 68000 instructions — numbers, as
+            Module 01 taught you. Your CPU can't execute them. The direct solution
+            is an <strong>interpreter</strong>: a software re-enactment of the
+            fetch–decode–execute loop. Keep a variable for the PC and one for each
+            of the 68000's registers D0–D7/A0–A7 and the CCR; loop forever: read
+            the word at PC, look at its opcode bits, jump to the matching handler
+            (&ldquo;this is an <code>ADD.W</code>: sum these two slots, set the
+            flags&rdquo;), advance PC, repeat. It's Module 01's toy lab and Module
+            08's assembler, scaled up — and it is exactly what both Genesis Plus GX
+            and BlastEm do.
+          </p>
+          <p>
+            The cost is real: ten to fifty host instructions for each emulated
+            one, paid <em>again</em> every time that instruction runs. The
+            classic fix is a <strong>recompiler</strong>, or
+            <span class="term" data-tip="Just-In-Time / dynamic recompiler — translates guest code to host machine code at run time, the first time it's reached, then reuses the translation. Trades a one-off compile cost for near-native speed after.">JIT</span>:
+            translate each straight-line run of guest code (a
+            <span class="term" data-tip="A run of instructions with one entry and one exit, ended by a branch — the natural unit a recompiler translates and caches.">basic block</span>)
+            into equivalent x86-64 or ARM64 once, cache the result keyed by guest
+            address, and every later visit is a lookup and a jump. Amortised over
+            millions of executions, the one-off translation cost vanishes and the
+            loop runs near host speed — the technique that makes emulating fast,
+            modern consoles feasible at all.
+          </p>
+          <p>
+            Here's the honest twist for the Genesis, and it's a good lesson in
+            engineering judgement: <strong>the recompiler payoff barely matters
+            here</strong>. The 68000 runs at 7.67&nbsp;MHz. A modern PC can
+            <em>interpret</em> it — decode and re-execute every instruction, every
+            time — hundreds of times faster than real time without breaking a
+            sweat. So Genesis Plus GX and BlastEm choose interpretation on purpose:
+            it is dramatically simpler, easier to make bit-exact, and the speed it
+            leaves on the table is speed nobody needs. (BlastEm is celebrated
+            precisely for its cycle-accurate interpreter.) The recompiler's
+            amortisation argument is real — but it only pays when the guest is fast
+            enough to hurt, which a 7.67&nbsp;MHz chip simply isn't.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The two translators</span>
+            <p>
+              An <span class="term" data-tip="An emulator core that re-decodes and re-executes every guest instruction, every time — slower per instruction, but simple and easy to make faithful.">interpreter</span>
+              is a live translator who re-translates a speech every night from
+              scratch. A recompiler writes the translation down the first night
+              and just reads it thereafter — a huge win <em>if</em> the speech is
+              long and repeated enough to repay night one. For the Genesis, the
+              &ldquo;speech&rdquo; is delivered slowly enough that the live
+              translator keeps up effortlessly and never falls behind — so why hire
+              the more complicated one? Sometimes the simple tool is the right tool.
+            </p>
+          </div>
+
+          <p>
+            There's a second, larger challenge unique to a multi-chip console: an
+            emulator isn't running <em>one</em> CPU, it's running the 68000, the
+            Z80 <em>and</em> the VDP, each on its own clock, and they interact
+            (Module 10's bus, Module 09's sound handshake). The emulator advances
+            them in tiny interleaved slices — run the 68000 for a few cycles, run
+            the Z80 for its proportional share, let the VDP draw its lines, service
+            interrupts at the right instants — so that from any chip's point of
+            view the others behave exactly as the hardware did. Getting that
+            <em>scheduling</em> right, not raw CPU speed, is where Genesis emulation
+            actually gets hard (Module 14).
+          </p>
+
+          <p>
+            The lab races the two strategies over one hot loop, purely to make the
+            amortisation concrete. Watch the recompiler pay its striped translation
+            toll up front — at low repeat counts it actually <em>loses</em> — then
+            drag the run count up and watch it pull ahead. Then remember the punch
+            line: for a 7.67&nbsp;MHz 68000, the interpreter's line was already
+            fast enough, so the accurate emulators just… stay on it.
+          </p>
+
+          <div class="lab" id="lab-jit">
+            <div class="lab-head"><span class="dot"></span><span class="title">Interpreter-vs-recompiler lab — one hot loop, two strategies</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <div class="race">
+                <div class="race-lane">
+                  <div class="head"><span class="nm">Interpreter</span><span class="ips" data-int-ips>0 inst/s</span></div>
+                  <div class="bar-track"><div class="bar-fill" data-int-fill></div></div>
+                  <div class="sub"><span data-int-n>0</span> instructions executed · re-decodes every one, every pass</div>
+                </div>
+                <div class="race-lane">
+                  <div class="head"><span class="nm">Recompiler (JIT)</span><span class="chip" data-block-chip>block cache · empty</span><span class="ips" data-jit-ips>0 inst/s</span></div>
+                  <div class="bar-track"><div class="bar-fill jit" data-jit-fill></div></div>
+                  <div class="sub"><span data-jit-n>0</span> instructions executed · translates the block once, then runs native</div>
+                </div>
+              </div>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Loop runs — <span class="val" data-jit-runs-val>300</span></label>
+                  <input type="range" min="10" max="3000" value="300" step="10" data-jit-runs aria-label="How many times the loop repeats">
+                </div>
+                <button class="play-btn" data-jit-go>Race</button>
+                <button class="play-btn" data-jit-reset style="background:linear-gradient(180deg,#2c3040,#232736);color:var(--ink)">Reset</button>
+                <span style="font-size:12.5px;color:var(--muted)">Striped red = one-off translation cost. Try 10 runs, then 3000.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>An interpreter re-runs fetch–decode–execute in software: 10–50 host instructions per guest one, every pass.</li>
+              <li>A recompiler translates each basic block to native code once and reuses it — amortisation is the whole trick.</li>
+              <li>At 7.67 MHz the 68000 is easy to interpret faster than real time, so Genesis Plus GX and BlastEm deliberately keep the simpler, more accurate interpreter.</li>
+              <li>The real difficulty is scheduling: interleaving the 68000, Z80 and VDP on their own clocks so they interact exactly as the hardware did.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#gen-int"><span class="dir">← Prev · Part II</span><span class="ttl">12 · Interrupts on the Genesis</span></a>
+            <a class="next" href="#accuracy"><span class="dir">Next →</span><span class="ttl">14 · Timing &amp; the accuracy traps</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 14 --- -->
+      <section class="doc" id="accuracy">
+        <div class="mod-head">
+          <span class="eye">Module 14 <span class="part-tag">· Part III</span></span>
+          <h3>Timing &amp; the accuracy traps</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Tour the places where a plausible emulator and a truthful one pull apart: cross-chip timing, cycle-exact DMA, self-modifying code, and the sound-chip corner cases.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            If Module 13 made emulation sound like a solved problem, this module is
+            the cold shower. Translating an <code>ADD</code> is easy. The hard part
+            is everything the real hardware does <em>implicitly</em> — the exact
+            passage of time, the precise interleaving of three chips, the corner
+            cases of the bus — which software must now reproduce <em>explicitly</em>.
+            Accuracy isn't one dial; it's a series of specific traps, and each is a
+            place where an emulator author chose truth over convenience.
+          </p>
+
+          <h4>Trap 1 · Time is shared between chips</h4>
+          <p>
+            A real Genesis runs its 68000, Z80 and VDP simultaneously, and games
+            depend on their exact relative timing. If the emulator runs the 68000
+            too far ahead before letting the VDP catch up, a game that writes a VDP
+            register expecting the beam to be at a certain scanline will see the
+            wrong line — and a raster effect (Module 12) lands in the wrong place,
+            or a status bar tears. The fix is fine-grained interleaving: advance
+            each chip in small steps and never let one race too far ahead of the
+            others. Too coarse and you get subtle glitches; too fine and you burn
+            host CPU on synchronisation. This balance is the single biggest quality
+            difference between a &ldquo;runs most games&rdquo; emulator and a
+            reference one.
+          </p>
+
+          <h4>Trap 2 · Cycle-exact DMA and bus stalls</h4>
+          <p>
+            Module 10's arbitration must be modelled to the cycle. When the VDP
+            runs a DMA, the real 68000 freezes for a precise number of cycles that
+            depends on where in the frame the DMA happens. Some games lean right up
+            against that timing — kicking off a DMA and then doing exactly as much
+            68000 work as fits before the beam reaches a critical line. Model the
+            stall as slightly too short or too long and the game's careful
+            choreography drifts. BlastEm in particular built its reputation on
+            getting these cycle counts right where looser emulators approximate
+            them.
+          </p>
+
+          <h4>Trap 3 · Code that rewrites itself</h4>
+          <p>
+            A recompiler (if one is used) caches its translation of the guest's
+            code — but Genesis games load new code from the cartridge, decompress
+            routines into RAM, and occasionally patch themselves. The moment those
+            bytes change, a cached translation of the <em>old</em> bytes is a lie,
+            and the emulator must notice the write and invalidate the stale block
+            or it will keep executing a ghost. (This is a headache recompilers
+            carry and pure interpreters neatly sidestep — one more reason the
+            accurate Genesis emulators favour interpretation from Module 13.)
+          </p>
+
+          <h4>Trap 4 · The sound chips are analogue-ish</h4>
+          <p>
+            The YM2612 FM chip (Module 09) is where &ldquo;close enough&rdquo; goes
+            to die. Its real output has quirks — a slightly crunchy DAC, an
+            infamous &ldquo;ladder effect&rdquo; distortion, exact envelope timing —
+            that define the Genesis' sonic character. Early emulators approximated
+            the chip and sounded subtly wrong to anyone who knew the hardware. The
+            project <strong>Nuked-OPN2</strong> answered this by emulating the
+            YM2612 at the transistor-netlist level — essentially simulating the
+            actual silicon — and Genesis Plus GX can use it for reference-grade FM.
+            It's the audio equivalent of cycle-exact CPU timing: correctness measured
+            against the real chip's bits and quirks, not against what sounds
+            plausible.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A cover band vs the master tape</span>
+            <p>
+              A tribute band can play all the right notes and satisfy a casual
+              listener. But hand the original master tape to someone who grew up on
+              it and they'll hear every difference: the exact reverb, the slightly
+              detuned lead, the tape hiss. Games are that superfan — a mountain of
+              accidental dependencies on the exact timing, the exact bus stalls, the
+              exact FM distortion. <strong>Plausible</strong> gets the notes right;
+              <strong>accurate</strong> is what stops two decades of software from
+              noticing it isn't playing on real hardware.
+            </p>
+          </div>
+
+          <div class="note warn">
+            <div class="ico">▲</div>
+            <div><p><strong>Why not just always be maximally accurate?</strong>
+            Because precision costs host cycles — fine interleaving, cycle-exact bus
+            modelling and netlist-level FM all add work. For the Genesis the budget
+            is generous (Module 13: the guest is slow), so the best emulators can
+            afford to be very accurate — which is exactly why Genesis Plus GX and
+            BlastEm aim for reference-grade behaviour rather than trading it away.
+            The lesson generalises: pick the accuracy the platform's speed lets you
+            afford, and spend it where games can tell.</p></div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The 68000, Z80 and VDP share time; fine interleaving keeps their interactions — especially raster timing — correct.</li>
+              <li>DMA bus stalls must be cycle-accurate, because some games time their work right up against them.</li>
+              <li>Self-modifying and freshly-loaded code makes cached recompilations stale — a hazard interpreters avoid.</li>
+              <li>Faithful sound needs the YM2612's quirks; Nuked-OPN2 emulates the chip at the netlist level for reference-grade FM.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#emu"><span class="dir">← Prev</span><span class="ttl">13 · Interpreters vs recompilers</span></a>
+            <a class="next" href="#try"><span class="dir">Next →</span><span class="ttl">15 · Try it in an emulator</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 15 --- -->
+      <section class="doc" id="try">
+        <div class="mod-head">
+          <span class="eye">Module 15 <span class="part-tag">· Part III</span></span>
+          <h3>Try it in an emulator</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Turn the whole course into things you can actually see and toggle in a real emulator — then close the loop back to Module 01.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            You now have the full picture, so let's make it hands-on. Both Genesis
+            Plus GX (widely available as a libretro core in RetroArch) and BlastEm
+            expose debugging and configuration that map directly onto everything
+            you've learned. Names shift between versions, so we'll describe each by
+            what it <em>does</em> — which, pleasantly, you can now explain from
+            first principles:
+          </p>
+          <ul>
+            <li><strong>The debugger / disassembler</strong> — BlastEm ships a built-in debugger; Genesis Plus GX has debug builds and the libretro core exposes state. Point it at a running game and you'll see live 68000 registers D0–D7/A0–A7, the PC, and the <strong>CCR flags X N Z V C</strong> — the exact board from your Module 08 lab, now driven by a real game. Single-step it and watch <code>MOVE</code>, <code>DBRA</code> and <code>Bcc</code> do their thing.</li>
+            <li><strong>The VDP / plane viewer</strong> — most Genesis emulators can show the raw tile planes, the sprite list and the palette. Find a game with a status bar and you'll <em>see</em> the Module 12 split: the scroll value changing at one scanline.</li>
+            <li><strong>Interrupt / raster visualisation</strong> — some builds mark where on the screen interrupts fire. That horizontal line mid-frame is the HBlank of Module 12, live.</li>
+            <li><strong>Region &amp; timing (NTSC/PAL)</strong> — switch a game between 60 Hz NTSC and 50 Hz PAL and watch the speed and pitch change. That's the 7.67 vs 7.60 MHz clock and the 224 vs 240 line count from Modules 06 and 12, felt directly.</li>
+            <li><strong>The Nuked-OPN2 FM option</strong> — where offered (Genesis Plus GX), toggle between the fast FM approximation and the netlist-accurate Nuked-OPN2 core and listen for the difference Module 14 described. On a good pair of headphones it's audible.</li>
+          </ul>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · X-ray glasses for a machine you know</span>
+            <p>
+              Before this course, an emulator's debug menus were a wall of jargon —
+              you'd toggle something and hope. Now you've been inside the machine and
+              traced every wire: the register panel is your Module 08 CCR, the plane
+              viewer is Module 12's raster split, the FM toggle is Module 14's
+              accuracy trade. The tools stop being intimidating the instant you know
+              what each readout is soldered to.
+            </p>
+          </div>
+
+          <h4>Three experiments worth actually running</h4>
+          <ul>
+            <li><strong>Step the CPU.</strong> Open a debugger, pause a game, and single-step a few instructions. You'll recognise everything — the opcodes, the flags updating, a <code>BSR</code>/<code>RTS</code> pair pushing and popping the stack from Module 04. The course, running for real.</li>
+            <li><strong>Break the timing on purpose.</strong> If your emulator offers an &ldquo;inaccurate/fast&rdquo; timing mode, switch to it and find a game with fancy raster effects (a wavy water line, a parallax background). Watch the effect glitch or tear — that's Module 14's Trap 1 made visible.</li>
+            <li><strong>A/B the FM chip.</strong> Toggle Nuked-OPN2 on and off during a bass-heavy tune. Sorting out <em>what</em> changed is a live lesson in why bit-exact hardware emulation matters (Module 14).</li>
+          </ul>
+
+          <p>
+            And that's the course. You began with a cook and a stack of numbered
+            cards; you end able to read a 68000 disassembly, explain why the Genesis
+            carries a whole second CPU just for sound, predict which scanline a
+            raster effect fires on, and say exactly why the accurate emulators
+            interpret rather than recompile. The fetch–decode–execute loop is still
+            down there, under everything, turning — on a 1988 games console, on the
+            machine you're reading this with, and in the emulator faithfully
+            pretending to be one on the other.
+          </p>
+
+          <div class="takeaway">
+            <div class="th">Course complete ✦</div>
+            <ul>
+              <li>You can trace a frame end-to-end: the 68000 runs the game, VBlank paces it, HBlank paints the tricks, the Z80 keeps the music, the bus arbitrates between them.</li>
+              <li>You can read and step 68000 assembly and predict the CCR flags — you built a working assembler doing exactly that.</li>
+              <li>You know why Genesis emulation favours accurate interpretation, and where its real difficulty (cross-chip timing) lives.</li>
+              <li>Want the rest of the console? Continue with the <a href="../graphics/">graphics &amp; VDP</a>, <a href="../audio/">FM &amp; PSG audio</a>, <a href="../cartridge/">cartridge</a> and <a href="../homebrew/">homebrew</a> courses.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#accuracy"><span class="dir">← Prev</span><span class="ttl">14 · Timing &amp; the accuracy traps</span></a>
+            <a class="next" href="#loop"><span class="dir">↺ Restart</span><span class="ttl">01 · The fetch–decode–execute loop</span></a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <p>
+          An interactive course on the Sega Genesis / Mega Drive CPU, part of the
+          <a href="../">Inside the Sega Genesis</a> collection. Every lab on this
+          page — including the working 68000 assembler — is a from-scratch
+          simulation written for teaching; no game code, no copyrighted material,
+          nothing emulated for real. Hardware details are grounded in public
+          documentation and the open-source emulators
+          <a href="https://github.com/libretro/Genesis-Plus-GX">Genesis&nbsp;Plus&nbsp;GX</a>,
+          <a href="https://github.com/libretro/blastem">BlastEm</a> and
+          <a href="https://github.com/nukeykt/Nuked-OPN2">Nuked-OPN2</a>; figures we
+          couldn't pin down precisely are hedged on purpose. Sega, Genesis and Mega
+          Drive are trademarks of Sega; this is an independent, non-commercial
+          educational project with no affiliation.
+        </p>
+        <p class="src">
+          Grounded in · <code>Genesis-Plus-GX/core/m68k/</code> ·
+          <code>blastem/m68k_core.c</code> · <code>blastem/vdp.c</code> ·
+          <code>Nuked-OPN2/ym3438.c</code>
+        </p>
+      </footer>
+
+    </div><!-- /wrap -->
+  </main>
+</div><!-- /app -->
+
+<script src="app.js"></script>
+</body>
+</html>
