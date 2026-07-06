@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Genesis Homebrew — write &amp; run your own game with SGDK</title>
+<meta name="description" content="A hands-on course on writing your own Sega Genesis / Mega Drive software. The SGDK toolkit and the m68k-elf-gcc cross-compiler, the cartridge ROM format, setup on Windows, macOS and Linux, and every step from an empty folder to code running in BlastEm and on real hardware.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%23ff5347%27/%3E%3Crect x=%276%27 y=%278%27 width=%2720%27 height=%275%27 rx=%272%27 fill=%27%230a0b10%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="progress" aria-hidden="true"><div class="fill" id="progress-fill"></div></div>
+<button class="menu-btn" id="menu-btn" aria-label="Open contents">☰</button>
+<div class="scrim" id="scrim"></div>
+
+<div class="app">
+
+  <!-- ================================================= SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Genesis Homebrew</h1>
+        <span class="sub">A course · 13 modules</span>
+      </div>
+    </div>
+
+    <nav class="toc" aria-label="Course contents">
+      <div class="toc-group">Part I · Getting started</div>
+      <a href="#what"><span class="n">01</span><span>What homebrew is</span></a>
+      <a href="#toolchain"><span class="n">02</span><span>The toolchain: SGDK</span></a>
+      <a href="#setup"><span class="n">03</span><span>Setup · Win / Mac / Linux</span></a>
+
+      <div class="toc-group">Part II · Building a game</div>
+      <a href="#hello"><span class="n">04</span><span>Hello, world</span></a>
+      <a href="#pipeline"><span class="n">05</span><span>The build &amp; the ROM header</span></a>
+      <a href="#tiles"><span class="n">06</span><span>Tiles &amp; the VDP from C</span></a>
+      <a href="#sprites"><span class="n">07</span><span>Sprites</span></a>
+      <a href="#sound"><span class="n">08</span><span>Sound: FM &amp; PSG on the Z80</span></a>
+      <a href="#input"><span class="n">09</span><span>Reading the controller</span></a>
+      <a href="#loop"><span class="n">10</span><span>The 60 Hz game loop</span></a>
+
+      <div class="toc-group">Part III · Running it</div>
+      <a href="#blastem"><span class="n">11</span><span>Running in BlastEm</span></a>
+      <a href="#hardware"><span class="n">12</span><span>On real hardware</span></a>
+      <a href="#next"><span class="n">13</span><span>Where to go next</span></a>
+
+      <div class="progress-note">Progress · <b id="pct">0%</b></div>
+    </nav>
+  </aside>
+
+  <!-- ================================================= MAIN =============== -->
+  <main class="main">
+
+    <!-- ------------------------------------------------ HERO -------------- -->
+    <header class="hero">
+      <canvas id="hero-tokens" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <div class="inner">
+          <span class="eyebrow">An interactive course · SGDK &amp; m68k-elf-gcc</span>
+          <h2>Now <span class="grad">write your own.</span></h2>
+          <p class="lede">
+            The other courses in this collection took the Sega Genesis apart —
+            the 68000, the Z80, the VDP, the sound chips — and showed how
+            emulators put it back together. This course closes the loop: you
+            write code and <strong>the real machine runs it</strong>. It covers
+            the free, open toolkit the community built around
+            <strong>SGDK</strong> and the <strong>m68k-elf-gcc</strong>
+            cross-compiler, the cartridge ROM format every retail game also
+            uses, full setup for <strong>Windows, macOS and Linux</strong>, and
+            every step from an empty folder to a playable program in
+            <strong>BlastEm</strong> — and on a real console through a
+            flashcart. You'll need a computer, a little patience with C, and
+            nothing from Sega at all.
+          </p>
+          <div class="cta-row">
+            <a class="btn primary" href="#what">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Begin the course
+            </a>
+            <a class="btn" href="#setup">Skip to machine setup</a>
+          </div>
+
+          <div class="arc-cards">
+            <a class="arc" href="#part-a">
+              <div class="an">PART I</div>
+              <h4>Getting started</h4>
+              <p>What homebrew is (and isn't), the SGDK toolkit and the 68000 cross-compiler, and how to install it all on your own machine.</p>
+              <div class="cnt">3 modules</div>
+            </a>
+            <a class="arc" href="#part-b">
+              <div class="an">PART II</div>
+              <h4>Building a game</h4>
+              <p>Hello-world on the VDP, the build pipeline and the ROM header, tiles, sprites, FM/PSG sound, the controller, and the 60 Hz loop.</p>
+              <div class="cnt">7 modules · with labs</div>
+            </a>
+            <a class="arc" href="#part-c">
+              <div class="an">PART III</div>
+              <h4>Running it</h4>
+              <p>The tight BlastEm development loop, running on a real Genesis through a Mega EverDrive, and where to take your skills next.</p>
+              <div class="cnt">3 modules</div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+
+      <!-- ============================================ PART A ============== -->
+      <section class="part" id="part-a">
+        <div class="part-inner">
+          <div class="kicker">Part I</div>
+          <h3>Getting started</h3>
+          <p>
+            Before touching a compiler, you should know what you're joining.
+            This first stretch explains what console homebrew actually is, how
+            a legal, Sega-free toolchain for a 1988 console can even exist, and
+            how to install it on your computer. Everything here connects
+            backwards to the other courses: the machine you're about to program
+            is the one they dissected.
+          </p>
+          <div class="part-meta"><span>Modules <b>01–03</b></span><span>Difficulty <b>Beginner</b></span><span>Prerequisite <b>some C helps</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 01 --- -->
+      <section class="doc" id="what">
+        <div class="mod-head">
+          <span class="eye">Module 01 <span class="part-tag">· Part I</span></span>
+          <h3>What homebrew is (and isn't)</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Know exactly what "homebrew" means, why writing your own Genesis software is a legitimate craft distinct from piracy, and what the scene has built.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            <strong>Homebrew</strong> is software for a games console written
+            by people outside the console maker's licensed-developer program.
+            No official development kit, no signed contract, no access to
+            Sega's tools or documentation — just the machine itself, publicly
+            available knowledge about how it works, and a toolchain built by
+            volunteers. The word covers everything from a scrolling "hello
+            world" to full games, demos, chiptune players and cartridge
+            utilities. The Genesis is one of the friendliest consoles ever made
+            for this: it never had a serious lockout on cartridges, its
+            hardware is exhaustively documented, and a modern C toolkit —
+            <span class="term" data-tip="Sega Genesis Development Kit: a free, open-source C/68000 library and toolchain by Stéphane Dallongeville, the de-facto standard for modern Genesis homebrew.">SGDK</span>
+            — makes it approachable in an afternoon.
+          </p>
+          <p>
+            Draw the line clearly, because the internet often smudges it:
+            homebrew is <em>writing your own software</em>. It is not copying
+            games, and this course has nothing to do with piracy. You'll build
+            programs from your own source code with a toolchain containing no
+            Sega code whatsoever, and you'll run them either in an emulator or
+            on a flashcart designed to load <em>your own</em> ROM images.
+            (The usual disclaimer: this is an educational overview, not legal
+            advice, and details vary by jurisdiction — but "I wrote a program
+            and ran it on hardware I own" is about as clean as the hobby gets.)
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Cooking in someone else's kitchen</span>
+            <p>
+              A licensed developer rents the kitchen with the chef's blessing:
+              recipe book, branded ingredients, a hotline to the manufacturer.
+              A homebrew developer owns the same kitchen — they bought it — but
+              arrives with no recipe book at all. Everything they know about the
+              oven's quirks was worked out by a community of cooks comparing
+              notes for decades. The food is entirely theirs; only the kitchen
+              is Sega's design. Nobody is stealing meals.
+            </p>
+          </div>
+
+          <h4>How a 1988 console stays programmable</h4>
+          <p>
+            The Genesis launched with cartridges as its only medium, and —
+            unlike its rivals — never enforced a strong cryptographic lockout on
+            them. Later models added
+            <span class="term" data-tip="TradeMark Security System: a small check on later Genesis models. At boot the console verifies the cartridge writes the string 'SEGA' to a specific register and that the ROM header starts with 'SEGA'. It is a trademark gate, not encryption — and SGDK handles it for you automatically.">TMSS</span>,
+            a light trademark check at boot (the reason your ROM header must
+            begin with "SEGA"), but that is a formality any homebrew ROM
+            satisfies for free. So the path for hobbyist code has always been
+            open: build a ROM image, put it on a cartridge you can rewrite, and
+            the console runs it. The scene's real work was the other half — a
+            toolchain. Volunteers ported <strong>GCC</strong> — the free C/C++
+            compiler — to target the Genesis's Motorola 68000, and built
+            libraries and asset tools on top. That effort's most polished form
+            is <strong>SGDK</strong>, the kit this course teaches.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 250" role="img" aria-label="Two development worlds compared: the licensed path with Sega's SDK, and the homebrew path with SGDK, m68k-elf-gcc and community documentation — both producing 68000 code the same console runs">
+              <text x="60" y="34" class="d-tag d-red">Licensed development (1989)</text>
+              <rect x="60" y="50" width="180" height="46" rx="9" class="d-fill-panel d-red-s" stroke-width="1.5"/>
+              <text x="150" y="70" text-anchor="middle" class="d-label" style="font-size:12.5px">Sega SDK &amp; docs</text>
+              <text x="150" y="87" text-anchor="middle" class="d-sub">under NDA</text>
+              <rect x="60" y="106" width="180" height="46" rx="9" class="d-fill-panel d-red-s" stroke-width="1.5"/>
+              <text x="150" y="126" text-anchor="middle" class="d-label" style="font-size:12.5px">dev cartridge HW</text>
+              <text x="150" y="143" text-anchor="middle" class="d-sub">leased, not sold</text>
+              <text x="60" y="190" class="d-tag d-blue">Homebrew (today)</text>
+              <rect x="60" y="200" width="180" height="40" rx="9" class="d-fill-panel d-blue-s" stroke-width="1.5"/>
+              <text x="150" y="225" text-anchor="middle" class="d-label" style="font-size:12.5px">SGDK + m68k-elf-gcc</text>
+              <rect x="250" y="200" width="150" height="40" rx="9" class="d-fill-panel d-blue-s" stroke-width="1.5"/>
+              <text x="325" y="225" text-anchor="middle" class="d-label" style="font-size:12.5px">community docs</text>
+              <defs><marker id="ah01" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker></defs>
+              <line x1="420" y1="101" x2="560" y2="120" class="d-axis" stroke-width="1.8" marker-end="url(#ah01)"/>
+              <line x1="420" y1="220" x2="560" y2="150" class="d-axis" stroke-width="1.8" marker-end="url(#ah01)"/>
+              <rect x="250" y="50" width="150" height="102" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.2"/>
+              <text x="325" y="95" text-anchor="middle" class="d-label" style="font-size:12.5px">your C code</text>
+              <text x="325" y="114" text-anchor="middle" class="d-sub">same on both paths</text>
+              <rect x="565" y="95" width="180" height="66" rx="10" class="d-fill-panel d-good-s" stroke-width="1.6"/>
+              <text x="655" y="122" text-anchor="middle" class="d-label" style="font-size:13px">68000 machine code</text>
+              <text x="655" y="142" text-anchor="middle" class="d-sub">the CPU can't tell the difference</text>
+              <line x1="745" y1="128" x2="800" y2="128" class="d-axis" stroke-width="1.8" marker-end="url(#ah01)"/>
+              <rect x="805" y="106" width="70" height="44" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="840" y="133" text-anchor="middle" class="d-label" style="font-size:12px">🕹️</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Two roads, one destination.</strong> A licensed studio compiled C (or hand-wrote 68000 assembly) against Sega's SDK; you'll compile C against SGDK with a free compiler. Both roads end in Motorola 68000 machine code, and the CPU executes yours exactly as willingly as it executed a retail cartridge. The hardware has no opinion about who wrote the program.</figcaption>
+          </figure>
+
+          <h4>What you can realistically build</h4>
+          <p>
+            Everything the machine can do is on the table, because homebrew code
+            runs with full control of the hardware — there is no operating
+            system underneath you (a fact Module 10 turns into a superpower).
+            The scene has produced platformers, shmups, puzzle games, RPGs,
+            chiptune demos and hardware test ROMs. Your ceiling is the
+            console's: the <a href="../cpu/">68000</a> at 7.67&nbsp;MHz, the
+            <a href="../z80/">Z80</a> sound coprocessor, the
+            <a href="../vdp/">VDP</a>'s tile-and-sprite engine, the
+            <a href="../audio/">YM2612 and PSG</a> for sound, and 64&nbsp;KB of
+            work RAM. Those courses taught you the machine as an examiner; this
+            one hands you the keys.
+          </p>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Homebrew = your own software for the console, built without Sega's SDK or blessing — a separate thing from piracy entirely.</li>
+              <li>The Genesis never locked its cartridges; TMSS on later models is a trademark check your ROM header satisfies for free.</li>
+              <li>The scene's pillar is a free toolchain — SGDK on top of m68k-elf-gcc — with no Sega code in it.</li>
+              <li>You need no special hardware to start: SGDK plus an emulator like BlastEm is a complete development loop.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a class="disabled" aria-disabled="true"><span class="dir">← Prev</span><span class="ttl">Start of course</span></a>
+            <a class="next" href="#toolchain"><span class="dir">Next →</span><span class="ttl">02 · The toolchain</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 02 --- -->
+      <section class="doc" id="toolchain">
+        <div class="mod-head">
+          <span class="eye">Module 02 <span class="part-tag">· Part I</span></span>
+          <h3>The toolchain: SGDK &amp; m68k-elf-gcc</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand what a cross-compiler is, what each piece of SGDK does, and why code built on your x86/ARM laptop runs on a Motorola 68000 console.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Your computer and the Genesis speak different machine languages.
+            Your laptop's processor executes x86-64 or ARM instructions; the
+            Genesis's
+            <span class="term" data-tip="Motorola 68000: the Genesis's main CPU, a 16/32-bit processor at 7.67 MHz NTSC. 16-bit data bus, 24-bit address bus (16 MB reach), 32-bit internal registers. Covered in depth by the CPU course.">68000</span>
+            executes Motorola 68000 machine code (the
+            <a href="../cpu/">CPU course</a> spent a long time on it). A normal
+            compiler produces programs for the machine it runs on. What you need
+            is a <strong>cross-compiler</strong>: a compiler that <em>runs</em>
+            on your machine but <em>emits</em> code for a different one. This is
+            utterly routine in embedded development — it's how router firmware
+            and spacecraft code get built — and it's the single concept that
+            makes console homebrew possible.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The translator who never travels</span>
+            <p>
+              A cross-compiler is a translator living in your city who writes
+              flawless letters in a language spoken only on a distant island.
+              The translator never needs to visit the island; they just need to
+              know the language perfectly. Your PC never executes a single
+              68000 instruction during a build — it only <em>writes</em> them,
+              and the finished ROM is posted to the console afterwards.
+            </p>
+          </div>
+
+          <h4>The pieces, by name</h4>
+          <p>
+            The modern Genesis toolchain is bundled as <strong>SGDK</strong> —
+            the Sega Genesis Development Kit, an open-source project created and
+            maintained by <strong>Stéphane Dallongeville</strong>. You'll see
+            these names constantly, so meet the cast once, properly:
+          </p>
+          <div class="defs">
+            <div class="row"><dt>SGDK</dt><dd>The umbrella project: a C library (its runtime is called <code>libmd</code>), a set of asset tools, sample projects, and the makefiles that tie it all together. Everything below ships inside it.</dd></div>
+            <div class="row"><dt>m68k-elf-gcc</dt><dd>The cross-compiler: GCC configured to target <code>m68k-elf</code> — bare-metal Motorola 68000 with no operating system assumed. With it come the GNU <strong>binutils</strong> (<code>m68k-elf-as</code> the assembler, <code>m68k-elf-ld</code> the linker, <code>m68k-elf-objcopy</code>, <code>objdump</code>).</dd></div>
+            <div class="row"><dt>rescomp</dt><dd>SGDK's <strong>resource compiler</strong>. It reads a <code>.res</code> script listing your images, palettes, tilemaps and music, and turns each into 68000-ready data with C symbols you can reference. Module 05 watches it work.</dd></div>
+            <div class="row"><dt>libmd</dt><dd>The hardware library — Module 06's and beyond's subject. It wraps the VDP, the controllers, DMA, the sound driver and more in a sane C API, so you don't poke registers by hand.</dd></div>
+            <div class="row"><dt>the XGM driver</dt><dd>A small sound driver that runs on the <a href="../z80/">Z80</a> coprocessor, playing FM music and PSG sound effects while the 68000 gets on with the game (Module 08).</dd></div>
+            <div class="row"><dt>sample projects</dt><dd>A tree of small, working examples — sprites, scrolling, sound, input — that double as templates. Your first build in Module 04 starts from one.</dd></div>
+          </div>
+          <p>
+            Every tool in the toolchain carries the target's name as a prefix:
+            the compiler is <code>m68k-elf-gcc</code>, the linker
+            <code>m68k-elf-ld</code>, the object inspector
+            <code>m68k-elf-objdump</code>. The prefix is your constant reminder
+            that outputs are for the console, not for the machine you're sitting
+            at. SGDK's makefiles pass the 68000-appropriate flags for you
+            (<code>-m68000</code>, size-and-speed optimisation, the right memory
+            layout) — you rarely type them yourself.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 260" role="img" aria-label="Cross-compilation: source code on a host machine passes through m68k-elf-gcc and binutils to produce a 68000 ROM image that runs on the Genesis target">
+              <defs><marker id="ah02" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker></defs>
+              <rect x="40" y="40" width="330" height="180" rx="12" class="d-fill-panel d-stroke-line" stroke-width="1.5"/>
+              <text x="60" y="68" class="d-tag">HOST — your computer (x86-64 / ARM)</text>
+              <rect x="60" y="84" width="120" height="44" rx="8" class="d-fill-panel2 d-stroke-line" stroke-width="1.2"/>
+              <text x="120" y="103" text-anchor="middle" class="d-label" style="font-size:12px">main.c</text>
+              <text x="120" y="119" text-anchor="middle" class="d-sub">your source</text>
+              <line x1="180" y1="106" x2="218" y2="106" class="d-axis" stroke-width="1.8" marker-end="url(#ah02)"/>
+              <rect x="222" y="84" width="128" height="44" rx="8" class="d-fill-panel2 d-blue-s" stroke-width="1.4"/>
+              <text x="286" y="103" text-anchor="middle" class="d-label" style="font-size:11.5px">m68k-elf-gcc</text>
+              <text x="286" y="119" text-anchor="middle" class="d-sub">runs here…</text>
+              <text x="60" y="170" class="d-sub">also here: make, rescomp, objcopy,</text>
+              <text x="60" y="188" class="d-sub">objdump, your editor, BlastEm</text>
+              <line x1="370" y1="130" x2="520" y2="130" stroke="#4fd08a" stroke-width="2" marker-end="url(#ah02)"/>
+              <text x="445" y="118" text-anchor="middle" class="d-sub" style="fill:#4fd08a">rom.bin (68000)</text>
+              <rect x="525" y="40" width="330" height="180" rx="12" class="d-fill-panel d-stroke-line" stroke-width="1.5"/>
+              <text x="545" y="68" class="d-tag">TARGET — the Genesis (68000)</text>
+              <rect x="545" y="84" width="130" height="44" rx="8" class="d-fill-panel2 d-red-s" stroke-width="1.4"/>
+              <text x="610" y="103" text-anchor="middle" class="d-label" style="font-size:11.5px">68000 @ 7.67 MHz</text>
+              <text x="610" y="119" text-anchor="middle" class="d-sub">…code runs here</text>
+              <rect x="690" y="84" width="146" height="44" rx="8" class="d-fill-panel2 d-stroke-line" stroke-width="1.2"/>
+              <text x="763" y="103" text-anchor="middle" class="d-label" style="font-size:12px">64 KB RAM + VDP</text>
+              <text x="763" y="119" text-anchor="middle" class="d-sub">where the ROM maps in</text>
+              <text x="545" y="170" class="d-sub">no OS, no loader of its own — your ROM owns</text>
+              <text x="545" y="188" class="d-sub">the whole machine from the reset vector onward</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Host and target.</strong> Every tool runs on your computer; only the finished ROM image crosses to the console. An emulator like BlastEm blurs the line delightfully — it makes your host <em>pretend to be</em> the target, which is why the edit-compile-test loop in Module 11 can be seconds long.</figcaption>
+          </figure>
+
+          <h4>What "no operating system" means</h4>
+          <p>
+            The <code>m68k-elf</code> target means the compiler assumes a
+            <strong>bare-metal</strong> environment: no Linux, no Windows, no
+            system calls to lean on. When the console powers on it reads the
+            <span class="term" data-tip="The first 256 bytes of a Genesis ROM: a table of 32-bit addresses. Entry 0 is the initial stack pointer, entry 1 is the reset vector (where execution begins), and the rest point at exception and interrupt handlers.">68000 vector table</span>
+            at address 0 of your ROM, loads the stack pointer and jumps to the
+            reset vector — which is SGDK's startup code. That code clears RAM,
+            sets up the VDP, initialises <code>libmd</code>, and then calls your
+            <code>main()</code>. There is no <code>printf</code> to a terminal
+            here; "output" means drawing tiles on the screen, which is exactly
+            what Module 04 does.
+          </p>
+
+          <div class="note">
+            <span class="ico">◈</span>
+            <p>
+              Nothing in this toolchain is Sega's. GCC and binutils are GNU
+              projects; SGDK and its libraries were written by the community and
+              are open source. This matters legally (Module 01) but also
+              practically: you can read every line of the code your program is
+              built from, all the way down to the reset vector.
+            </p>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A cross-compiler runs on your machine but emits code for another — here, <code>m68k-elf-gcc</code> emitting 68000 machine code.</li>
+              <li>SGDK bundles the compiler, binutils, the <code>libmd</code> runtime, <code>rescomp</code>, the XGM sound driver and sample projects.</li>
+              <li>The target is bare metal: your ROM begins at the 68000 vector table, and SGDK's startup code runs before <code>main()</code>.</li>
+              <li>SGDK and everything under it is open source and free of Sega code — legally clean and completely readable.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#what"><span class="dir">← Prev</span><span class="ttl">01 · What homebrew is</span></a>
+            <a class="next" href="#setup"><span class="dir">Next →</span><span class="ttl">03 · Setup your machine</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 03 --- -->
+      <section class="doc" id="setup">
+        <div class="mod-head">
+          <span class="eye">Module 03 <span class="part-tag">· Part I</span></span>
+          <h3>Setup — Windows, macOS or Linux</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Install SGDK and the m68k toolchain on your OS, verify the install by building a real sample, and have BlastEm ready to run what you build.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            SGDK is developed on Windows and ships a ready-made toolchain there,
+            but it runs everywhere — the sanctioned cross-platform route is a
+            <strong>Docker image</strong> that bundles the exact compiler and
+            tools, so your build is identical on any OS. The shape is always the
+            same: <strong>(1)</strong> get SGDK, <strong>(2)</strong> make sure
+            the build can find it, <strong>(3)</strong> build a sample to prove
+            the chain works, and <strong>(4)</strong> install
+            <a href="#blastem">BlastEm</a> as your test console. Pick your OS
+            below — the page tries to guess it — and note that details drift over
+            time: if anything here disagrees with
+            <a href="https://github.com/Stephane-Dallongeville/SGDK">SGDK's own
+            README</a>, trust the README; the <em>shape</em> of the process is
+            what this module teaches.
+          </p>
+
+          <div class="os-tabs">
+            <div class="tab-row" role="tablist">
+              <button role="tab"><span class="os-ico">⊞</span> Windows</button>
+              <button role="tab"><span class="os-ico">⌘</span> macOS</button>
+              <button role="tab"><span class="os-ico">🐧</span> Linux</button>
+            </div>
+
+            <!-- Windows -->
+            <div class="tab-panel" role="tabpanel">
+              <p>
+                Windows is SGDK's native home: a release ships with the
+                <strong>m68k toolchain, the tools and the library already
+                built</strong>. You just unzip it and point one environment
+                variable at it.
+              </p>
+              <ul>
+                <li>Download the latest SGDK release from its <b>GitHub releases</b> page and unzip it to a path with <b>no spaces</b>, e.g. <code>C:\sgdk</code>.</li>
+                <li>Set an environment variable <b><code>GDK</code></b> to that folder (<code>GDK=C:\sgdk</code>).</li>
+                <li>Build from a project folder using the <code>make</code> that ships inside SGDK.</li>
+              </ul>
+              <div class="code">
+                <div class="code-head">cmd / PowerShell <button class="copy" type="button">copy</button></div>
+                <pre><span class="c">:: point GDK at your unzipped SGDK</span>
+$ <span class="hl">set GDK=C:\sgdk</span>
+<span class="c">:: build the current project with SGDK's bundled make</span>
+$ <span class="hl">%GDK%\bin\make -f %GDK%\makefile.gen</span>
+<span class="p">compiling main.c ...
+linking ... rom.out
+output ... rom.bin</span></pre>
+              </div>
+              <p>
+                Those last two lines are the whole course in miniature — an ELF
+                (<code>rom.out</code>) and a raw ROM (<code>rom.bin</code>), both
+                of which Module 05 will teach you to read.
+              </p>
+            </div>
+
+            <!-- macOS -->
+            <div class="tab-panel" role="tabpanel">
+              <p>
+                On macOS (Intel or Apple Silicon) the clean route is the
+                official <strong>Docker image</strong>: it carries the exact
+                <code>m68k-elf-gcc</code>, <code>rescomp</code> and library, so
+                you never build a toolchain by hand. Install
+                <a href="https://www.docker.com/">Docker Desktop</a>, then run
+                the build from your project directory:
+              </p>
+              <div class="code">
+                <div class="code-head">Terminal <button class="copy" type="button">copy</button></div>
+                <pre><span class="c"># from inside your project folder (contains src/ and res/)</span>
+$ <span class="hl">docker run --rm -v "$PWD":/src sgdk</span>
+<span class="c"># ↑ mounts the current folder as /src and runs SGDK's make inside</span>
+<span class="p">compiling main.c ...
+linking ... rom.out
+output ... rom.bin</span></pre>
+              </div>
+              <p>
+                You build the <code>sgdk</code> image once from SGDK's included
+                <code>Dockerfile</code> (<code>docker build -t sgdk .</code> in
+                the SGDK folder). After that, the one <code>docker run</code>
+                line above is your entire build command — no PATH surgery, no
+                Homebrew formula to keep current.
+              </p>
+            </div>
+
+            <!-- Linux -->
+            <div class="tab-panel" role="tabpanel">
+              <p>
+                Linux uses the same <strong>Docker</strong> route as macOS —
+                the most reliable way to get a matching toolchain — and it's the
+                same one command everywhere:
+              </p>
+              <div class="code">
+                <div class="code-head">shell <button class="copy" type="button">copy</button></div>
+                <pre><span class="c"># 1) build the image once, from the SGDK checkout:</span>
+$ <span class="hl">git clone https://github.com/Stephane-Dallongeville/SGDK</span>
+$ <span class="hl">cd SGDK &amp;&amp; docker build -t sgdk .</span>
+<span class="c"># 2) then, from any project folder:</span>
+$ <span class="hl">docker run --rm -v "$PWD":/src sgdk</span>
+<span class="p">output ... rom.bin</span></pre>
+              </div>
+              <p>
+                If you prefer a native install, the community also maintains
+                build scripts (e.g. the <b>Gendev</b> / <b>Marsdev</b> projects)
+                that compile <code>m68k-elf-gcc</code> and SGDK straight onto
+                your system and export a <code>GDK</code> variable — handy for
+                CI or an editor's build task. Docker is simply the least
+                fiddly.
+              </p>
+            </div>
+          </div>
+
+          <h4>Prove it works — build a sample</h4>
+          <p>
+            Never trust an install you haven't built with. SGDK ships a
+            <code>sample/</code> tree; copy one out, build it, and you have a
+            <code>rom.bin</code> to open in an emulator:
+          </p>
+          <div class="code">
+            <div class="code-head">any OS <button class="copy" type="button">copy</button></div>
+            <pre>$ <span class="hl">cp -r $GDK/sample/basics/hello-world ~/md-hello</span>
+$ <span class="hl">cd ~/md-hello</span>
+$ <span class="hl">make</span>          <span class="c"># (or the docker run line for your OS)</span>
+<span class="p">rescomp resources.res ...
+compiling main.c ...
+output ... out/rom.bin</span></pre>
+          </div>
+          <p>
+            Last step: install <strong>BlastEm</strong> (from
+            <a href="https://www.retrodev.com/blastem/">retrodev.com</a>; it
+            runs on all three OSes) and drag the freshly built
+            <code>rom.bin</code> onto it. Text on screen — a running Genesis
+            program you built — is the finish line for this module.
+          </p>
+
+          <div class="checklist" aria-label="Setup verification checklist">
+            <label><input type="checkbox" id="ck-sgdk"><span><b>SGDK installed</b> — release unzipped (Windows) or Docker image built (<code>docker images</code> lists <code>sgdk</code>).</span></label>
+            <label><input type="checkbox" id="ck-gdk"><span><b>Build can find it</b> — <code>GDK</code> points at SGDK (Windows), or the folder is mounted into the container.</span></label>
+            <label><input type="checkbox" id="ck-gcc"><span><b>Compiler answers</b> — a build invokes <code>m68k-elf-gcc</code> without a "command not found".</span></label>
+            <label><input type="checkbox" id="ck-build"><span><b>Sample builds</b> — <code>make</code> on a copied sample ends with <code>output ... rom.bin</code>.</span></label>
+            <label><input type="checkbox" id="ck-blastem"><span><b>BlastEm runs it</b> — dragging the <code>.bin</code> onto BlastEm shows the sample's output.</span></label>
+          </div>
+
+          <div class="note warn">
+            <span class="ico">⚠</span>
+            <p>
+              The classic first-day failures are a <code>GDK</code> variable that
+              points at the wrong folder, or a project path with spaces in it
+              (the 68000 makefiles dislike them). A correct <code>GDK</code>, a
+              space-free path, and a fresh shell fix virtually every early
+              problem.
+            </p>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Windows gets a prebuilt SGDK release; macOS and Linux use the official Docker image for an identical toolchain.</li>
+              <li>Point the build at SGDK via the <code>GDK</code> variable (Windows) or a mounted volume (Docker), then just run <code>make</code>.</li>
+              <li>Build a bundled sample to a <code>rom.bin</code> before writing your own — it proves the whole chain.</li>
+              <li>Install BlastEm as your test console; SGDK's README is the authority when details drift.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#toolchain"><span class="dir">← Prev</span><span class="ttl">02 · The toolchain</span></a>
+            <a class="next" href="#hello"><span class="dir">Next →</span><span class="ttl">04 · Hello, world</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART B ============== -->
+      <section class="part" id="part-b">
+        <div class="part-inner">
+          <div class="kicker">Part II</div>
+          <h3>Building a game</h3>
+          <p>
+            Vocabulary over; hands on. This is the heart of the course: the
+            traditional first program on the VDP, the pipeline that turns your
+            source into a cartridge image and the header that image carries,
+            then the four pillars of any real game — tiles, sprites, sound and
+            input — and the 60 Hz loop that binds them to the display's clock.
+            By the end you will have watched code you compiled boot on an
+            (emulated) Genesis. That moment does not get old.
+          </p>
+          <div class="part-meta"><span>Modules <b>04–10</b></span><span>Difficulty <b>Beginner → Intermediate</b></span><span>Labs <b>5 interactive · 1 playable</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 04 --- -->
+      <section class="doc" id="hello">
+        <div class="mod-head">
+          <span class="eye">Module 04 <span class="part-tag">· Part II</span></span>
+          <h3>Hello, world</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Read the canonical SGDK hello-world line by line, and watch text appear on screen the only way the Genesis knows how — as tiles on a VDP plane.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Here is the traditional first program in SGDK. It is startlingly
+            short, because SGDK's startup code has already booted the machine
+            before your <code>main()</code> runs — cleared RAM, initialised the
+            VDP, loaded a default font into video memory. All that's left for
+            you is to say your line:
+          </p>
+
+          <div class="code">
+            <div class="code-head">src/main.c <button class="copy" type="button">copy</button></div>
+            <pre><span class="k">#include</span> <span class="s">&lt;genesis.h&gt;</span>   <span class="c">// SGDK's single front-door header</span>
+
+<span class="k">int</span> <span class="fn">main</span>() {
+    <span class="c">// SGDK already initialised the VDP and uploaded a font.</span>
+    <span class="c">// VDP_drawText writes tile indices into plane A's tilemap;</span>
+    <span class="c">// (column, row) are in 8x8 tiles, so (10, 12) is near centre.</span>
+    <span class="fn">VDP_drawText</span>(<span class="s">"HELLO, WORLD"</span>, <span class="n">10</span>, <span class="n">12</span>);
+
+    <span class="k">while</span> (<span class="n">1</span>) {
+        <span class="fn">SYS_doVBlankProcess</span>();   <span class="c">// wait for vblank; run SGDK's per-frame work</span>
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</pre>
+          </div>
+
+          <h4>Every line is doing something specific</h4>
+          <ul>
+            <li><strong><code>#include &lt;genesis.h&gt;</code></strong> — SGDK's umbrella header, pulling in the VDP, sprite, input, sound and DMA APIs in one line.</li>
+            <li><strong><code>VDP_drawText</code></strong> — the console has no text mode. This helper looks up each character in the font SGDK uploaded to <span class="term" data-tip="Video RAM: the VDP's own 64 KB of memory, holding tile pixel data, the tilemaps for planes A and B, the sprite table and scroll data. The 68000 reaches it only through the VDP's data port.">VRAM</span>, then writes the matching tile index into plane A's tilemap at the (column, row) you gave — in 8×8-tile units, not pixels.</li>
+            <li><strong><code>SYS_doVBlankProcess</code></strong> — blocks until the VDP finishes drawing the frame (the
+              <span class="term" data-tip="Vertical blank: the brief pause after the VDP finishes scanning a frame to the screen, before it starts the next. It fires a level-6 interrupt 60 times a second (NTSC) — the safe window to update VRAM and the metronome of every game.">vertical-blank interrupt</span>),
+              then runs SGDK's own per-frame housekeeping: DMA queue flush, sprite list upload, input refresh, sound driver sync. It is the heartbeat Module 10 is built on.</li>
+          </ul>
+          <p>
+            Notice what is <em>absent</em>: no framebuffer, no pixel plotting.
+            The Genesis is a tile machine. The screen is a grid of 8×8 tiles;
+            "drawing text" means choosing which tile sits in which grid cell.
+            Understanding that one fact is most of understanding the VDP, and
+            Module 06 builds on it directly.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A wall of pigeonholes</span>
+            <p>
+              A PC framebuffer is a blank canvas — paint any pixel any colour.
+              The Genesis screen is a post-office wall of pigeonholes, each
+              holding one 8×8 stamp from a book of stamps (the tileset in VRAM).
+              You don't paint the wall; you decide which stamp goes in each hole.
+              <code>VDP_drawText</code> just looks up the letter-stamps and slots
+              them into a row of holes. Everything the VDP does — backgrounds,
+              text, even sprites — is this same trick of arranging pre-drawn
+              stamps.
+            </p>
+          </div>
+
+          <p>
+            The lab below dramatises the first boot on a mock TV: a generic red
+            boot wordmark (a clearly non-Sega stand-in — we ship no copyrighted
+            logo or jingle), then the VDP comes up black, then your text is laid
+            into the tile grid one cell at a time, then the vblank loop counts
+            frames at 60&nbsp;Hz until you press START. Change the message — it's
+            your program now.
+          </p>
+
+          <div class="lab" id="lab-boot">
+            <div class="lab-head"><span class="dot"></span><span class="title">First-boot lab — the hello-world power-on sequence</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-mid" aria-label="Simulated Genesis screen replaying the hello-world boot sequence: a generic boot wordmark, then text drawn as VDP tiles"></canvas>
+              <div class="controls">
+                <div class="ctrl" style="min-width:220px">
+                  <label>your VDP_drawText string</label>
+                  <input type="text" data-boot-text value="HELLO WORLD" maxlength="20" aria-label="Text to draw" style="font:500 13px var(--mono);background:var(--panel-2);border:1px solid var(--line-2);border-radius:7px;color:var(--ink);padding:8px 10px;text-transform:uppercase">
+                </div>
+                <button class="play-btn" data-boot-run>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Power on &amp; run
+                </button>
+                <button class="reset-btn" data-boot-start>press START</button>
+                <div class="readouts">
+                  <span class="readout">state <b data-boot-state>powered off</b></span>
+                  <span class="readout">frames <b data-boot-frames>—</b></span>
+                </div>
+                <span class="sim-note">A dramatisation of the boot order: a generic boot wordmark (not Sega's logo) → VDP init → <code>VDP_drawText</code> laying tiles into plane A → the <code>SYS_doVBlankProcess</code> loop. Each glyph occupies one highlighted 8×8 tile cell.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>SGDK's startup code boots the machine before <code>main()</code>; your first program is essentially one draw call and a loop.</li>
+              <li>The Genesis has no text mode and no framebuffer — <code>VDP_drawText</code> places font <em>tiles</em> into plane A's tilemap.</li>
+              <li>Coordinates are in 8×8 tiles, not pixels: the whole screen is a grid of tile cells.</li>
+              <li><code>SYS_doVBlankProcess()</code> is the per-frame heartbeat; everything in Module 10 grows from it.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#setup"><span class="dir">← Prev</span><span class="ttl">03 · Setup your machine</span></a>
+            <a class="next" href="#pipeline"><span class="dir">Next →</span><span class="ttl">05 · The build &amp; the ROM header</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 05 --- -->
+      <section class="doc" id="pipeline">
+        <div class="mod-head">
+          <span class="eye">Module 05 <span class="part-tag">· Part II</span></span>
+          <h3>The build pipeline &amp; the ROM header</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Follow your source through compile, resource-compile, link and convert; then open the cartridge ROM header — the same one every retail game carries — field by field.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Typing <code>make</code> in Module 03 fired a multi-stage pipeline.
+            Most of it is the standard C build everyone half-remembers, plus two
+            Genesis-specific steps: a resource compiler for your art and music,
+            and a final conversion to a raw cartridge image.
+          </p>
+          <div class="pipe">
+            <div class="stage"><div class="t">main.c · .res</div><div class="d">your source + resources</div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">*.o</div><div class="d">m68k-elf-gcc + rescomp</div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">rom.out</div><div class="d">m68k-elf-ld: + libmd, an ELF</div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">rom.bin</div><div class="d">objcopy: raw big-endian ROM</div></div>
+          </div>
+          <ul>
+            <li><strong>Compile.</strong> <code>m68k-elf-gcc -c</code> turns each <code>.c</code> file into a <code>.o</code> object of 68000 machine code with unresolved references ("I call something named <code>VDP_drawText</code>, wherever that is").</li>
+            <li><strong>Resource-compile.</strong> <code>rescomp</code> reads your <code>resources.res</code> and converts each listed asset — a PNG tileset, a palette, a tilemap, an <span class="term" data-tip="Video Game Music: a logged register-write format for the Genesis sound chips. SGDK's rescomp converts VGM/XGM music into data the XGM Z80 driver plays back.">XGM</span> track — into a data object with C symbols you can reference by name.</li>
+            <li><strong>Link.</strong> <code>m68k-elf-ld</code> fuses your objects and the resource objects with SGDK's runtime
+              <span class="term" data-tip="SGDK's hardware library and C runtime: the reset/startup code, the VDP/sprite/input/sound APIs, and the memory layout for the 68000. Linked into every SGDK ROM.">libmd</span>,
+              resolves every name to an address, and lays the program out for the 68000's memory map — code and data from address 0 upward. Out comes an <strong>ELF</strong> (<code>rom.out</code>), symbols and all.</li>
+            <li><strong>Convert.</strong> <code>m68k-elf-objcopy</code> strips the ELF wrapper and writes the raw bytes the console expects: a flat <strong>ROM image</strong> (<code>rom.bin</code>, sometimes <code>.md</code>). SGDK also fixes up the header — length and checksum — at this point.</li>
+          </ul>
+          <p>
+            Keep both outputs. The <code>rom.out</code> ELF is your
+            <em>debugging</em> artefact — BlastEm and Genesis Plus GX can load
+            its symbols so a debugger shows function names. The
+            <code>rom.bin</code> is your <em>shipping</em> artefact — the exact
+            bytes that go on a cartridge or flashcart.
+          </p>
+
+          <div class="lab" id="lab-build">
+            <div class="lab-head"><span class="dot"></span><span class="title">Build-pipeline lab — watch make work</span><span class="badge">Canvas · animation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-mid" aria-label="Animated build pipeline from main.c and resources through object files and ELF to the final ROM image"></canvas>
+              <div class="controls">
+                <button class="play-btn" data-build-run>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Run the whole build
+                </button>
+                <button class="reset-btn" data-build-step>step</button>
+                <button class="reset-btn" data-build-reset>reset</button>
+                <div class="readouts">
+                  <span class="readout">newest artefact <b data-build-stage>main.c</b></span>
+                  <span class="readout">size <b data-build-size>1.4 KB</b></span>
+                </div>
+                <span class="sim-note">Sizes are illustrative. Notice most of the final ROM is <em>assets</em> — tiles, palettes and music that rescomp packed in — not your handful of C lines.</span>
+              </div>
+            </div>
+          </div>
+
+          <h4>The ROM header — the cartridge's ID card</h4>
+          <p>
+            A Genesis ROM begins with the 68000
+            <span class="term" data-tip="The first 256 bytes (0x000–0x0FF): 64 big-endian 32-bit addresses. Entry 0 = initial stack pointer, entry 1 = reset vector (start of execution), then exception and interrupt vectors including VBlank and HBlank.">vector table</span>
+            (the first 256 bytes), and immediately after it, at offset
+            <code>0x100</code>, sits a <strong>256-byte header</strong>: the
+            cartridge's ID card. This is not a homebrew invention — every retail
+            cartridge carries the same structure, and TMSS-equipped consoles
+            actually read the first bytes of it at boot. It is plain, mostly
+            human-readable data: the console signature "SEGA MEGA DRIVE", the
+            title in two languages, a serial number, a checksum, which
+            peripherals the game supports, the ROM and RAM address ranges, and
+            the region codes.
+          </p>
+          <p>
+            Everything in it is <strong>big-endian</strong> — the 68000 stores
+            the most-significant byte first, the opposite of your x86 laptop.
+            The lab below is a synthetic-but-format-correct header for a homebrew
+            ROM, generated by this page. Click each field group to highlight its
+            bytes (and their ASCII) and read what they mean. SGDK fills most of
+            these in for you from a small config, but knowing the layout is what
+            lets you set a title, declare 6-button support, or add save RAM.
+          </p>
+
+          <div class="lab" id="lab-rom">
+            <div class="lab-head"><span class="dot"></span><span class="title">ROM-header lab — inspect a real header, byte by byte</span><span class="badge">interactive</span></div>
+            <div class="lab-body">
+              <div class="dol-lab">
+                <div class="dol-hex" data-rom-hex aria-label="Hex dump of a 256-byte Genesis ROM header"></div>
+                <div class="dol-fields" data-rom-fields role="group" aria-label="ROM header fields"></div>
+                <div class="dol-decode" data-rom-decode aria-live="polite"></div>
+              </div>
+              <span class="sim-note">A synthetic but format-correct header at file offset 0x100. All multi-byte values are big-endian — your x86 laptop would read every number byte-reversed, a classic 68000 porting gotcha.</span>
+            </div>
+          </div>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The passport page</span>
+            <p>
+              The ROM header is the machine-readable page of a passport: a fixed
+              layout of fields — name, place, dates, a checksum line — that any
+              border booth can parse without knowing the traveller. The console
+              at power-on is that booth: it glances at "SEGA", checks the region
+              is one it serves, and waves the cartridge through to the reset
+              vector. The rest of the fields are for tools and humans, not the
+              boot ROM — but filling them in properly is what makes your ROM feel
+              like a real cartridge.
+            </p>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The pipeline is compile → resource-compile → link → convert: gcc + rescomp make objects, ld builds an ELF against libmd, objcopy emits the raw ROM.</li>
+              <li><code>rom.out</code> (ELF) is for debugging with symbols; <code>rom.bin</code> is the shipping cartridge image.</li>
+              <li>A ROM starts with the 68000 vector table, then a 256-byte header at 0x100: signature, titles, serial, checksum, I/O, ROM/RAM ranges, region.</li>
+              <li>Everything is big-endian; retail games use the identical header, and SGDK fills most of it in for you.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#hello"><span class="dir">← Prev</span><span class="ttl">04 · Hello, world</span></a>
+            <a class="next" href="#tiles"><span class="dir">Next →</span><span class="ttl">06 · Tiles &amp; the VDP</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 06 --- -->
+      <section class="doc" id="tiles">
+        <div class="mod-head">
+          <span class="eye">Module 06 <span class="part-tag">· Part II</span></span>
+          <h3>Tiles &amp; the VDP from C</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand the VDP's tile-and-plane model — 8×8 4bpp tiles, 16-colour palette lines, planes A and B and the Window — and drive it from SGDK.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The <span class="term" data-tip="Video Display Processor (Sega 315-5313 lineage): the Genesis's graphics chip. It composites two scrolling tile planes, a Window plane and sprites from tiles held in its 64 KB VRAM.">VDP</span>
+            is the chip you'll spend the most time with, and it thinks entirely
+            in <strong>tiles</strong>. A tile is an <strong>8×8 pixel</strong>
+            block stored at <strong>4 bits per pixel</strong> — so each pixel is
+            a number from 0–15, an index into a 16-colour
+            <span class="term" data-tip="Colour RAM: the VDP's 128-byte palette memory holding 4 lines of 16 colours (64 entries). Each colour is 9-bit BGR — 3 bits per channel — for 512 possible master colours. Index 0 of each line is transparent for sprites and upper planes.">palette line</span>.
+            The VDP holds four palette lines (64 colours on screen), and every
+            tile picks one of them. Colour 0 in a line means "transparent" for
+            sprites and the front plane. That's the whole colour model: 512
+            possible colours, 64 visible, chosen 16 at a time.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 210" role="img" aria-label="The VDP tile model: an 8x8 tile of 4-bit pixel indices maps through a 16-colour palette line to on-screen colours, and tiles are arranged in a plane tilemap">
+              <text x="40" y="30" class="d-tag">one 8×8 tile · 4bpp (indices 0–15)</text>
+              <g>
+                <rect x="40" y="42" width="128" height="128" rx="6" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              </g>
+              <text x="220" y="30" class="d-tag">palette line · 16 colours (9-bit BGR)</text>
+              <rect x="220" y="42" width="256" height="30" rx="5" class="d-fill-panel2 d-stroke-line" stroke-width="1.2"/>
+              <text x="220" y="96" class="d-sub">index 0 = transparent · 3 bits per R/G/B channel</text>
+              <text x="220" y="130" class="d-tag">arranged into a plane's tilemap →</text>
+              <rect x="220" y="140" width="230" height="52" rx="6" class="d-fill-panel d-blue-s" stroke-width="1.3"/>
+              <text x="335" y="170" text-anchor="middle" class="d-sub">plane A / B: 64×32 (or 64×64) tile cells</text>
+              <defs><marker id="aht" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker></defs>
+              <line x1="168" y1="106" x2="214" y2="80" class="d-axis" stroke-width="1.8" marker-end="url(#aht)"/>
+              <rect x="500" y="42" width="360" height="150" rx="8" class="d-fill-ground d-stroke-line" stroke-width="1.3"/>
+              <text x="520" y="66" class="d-tag d-red">what the VDP composites</text>
+              <text x="520" y="92" class="d-sub">· plane B — far background (scrolls)</text>
+              <text x="520" y="114" class="d-sub">· plane A — near background (scrolls)</text>
+              <text x="520" y="136" class="d-sub">· Window — a fixed, non-scrolling region of A</text>
+              <text x="520" y="158" class="d-sub">· sprites — up to 64 moving tile groups</text>
+              <text x="520" y="180" class="d-sub">resolution 320×224 (H40) or 256×224 (H32)</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Everything is tiles.</strong> The VDP composites two scrolling planes (A and B), an optional fixed Window carved out of A, and sprites — all built from the same 8×8 4bpp tiles in VRAM, coloured through the palette lines. Screen resolution is 320×224 in H40 mode (or 256×224 in H32); 224 lines on NTSC, 240 on PAL.</figcaption>
+          </figure>
+
+          <h4>Driving it from SGDK</h4>
+          <p>
+            You rarely poke the VDP's registers by hand — SGDK wraps the common
+            jobs. The pattern is: load a palette, upload a tileset to VRAM, then
+            write tile indices into a plane's tilemap.
+          </p>
+          <div class="code">
+            <div class="code-head">tiles from C <button class="copy" type="button">copy</button></div>
+            <pre><span class="c">// 'logo' is generated by rescomp from an image listed in resources.res</span>
+<span class="fn">PAL_setPalette</span>(PAL1, logo.palette-&gt;data, DMA);      <span class="c">// 16 colours → palette line 1</span>
+<span class="fn">VDP_drawImageEx</span>(BG_A, &amp;logo,
+    <span class="fn">TILE_ATTR_FULL</span>(PAL1, <span class="n">0</span>, <span class="n">0</span>, <span class="n">0</span>, <span class="fn">TILE_USER_INDEX</span>),
+    <span class="n">5</span>, <span class="n">3</span>, <span class="n">FALSE</span>, <span class="n">TRUE</span>);                    <span class="c">// place it on plane A at cell (5,3)</span>
+
+<span class="c">// scroll plane B slowly for a parallax backdrop</span>
+<span class="fn">VDP_setHorizontalScroll</span>(BG_B, offset++);</pre>
+          </div>
+          <p>
+            A <strong>tile attribute</strong> — the value stored per cell in a
+            tilemap — packs four things into 16 bits: the tile's index in VRAM,
+            which of the four palette lines to use, horizontal and vertical
+            flip flags, and a priority bit that lifts the tile in front of
+            higher planes. <code>TILE_ATTR_FULL</code> just builds that word for
+            you. Scrolling is nearly free: the VDP reads scroll offsets from its
+            own memory every frame, and it supports whole-plane, per-8-pixel-cell
+            or even <strong>per-scanline</strong> horizontal scroll — the last
+            of which, combined with the
+            <span class="term" data-tip="Horizontal-blank interrupt: fires on a programmable scanline count during drawing (level 4). Changing scroll or palette here produces mid-screen raster effects: water lines, heat haze, gradient skies.">HBlank interrupt</span>,
+            is how the era's water ripples and gradient skies were made.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A mosaic with a swappable tile box</span>
+            <p>
+              A plane is a mosaic laid on a grid, but the clever part is that the
+              box of tiles is small and swappable. You keep only the tiles
+              currently on screen in VRAM; as the level scrolls, you quietly
+              replace tiles at the edges just before they're needed. The picture
+              can be enormous while the tile box stays tiny — the trick behind
+              every side-scroller the console ever ran.
+            </p>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The VDP is a tile engine: 8×8 4bpp tiles in VRAM, coloured by one of four 16-colour palette lines (64 colours from a palette of 512).</li>
+              <li>It composites planes A and B, an optional fixed Window, and sprites — all from the same tiles.</li>
+              <li>A tilemap cell is a 16-bit attribute: tile index + palette line + H/V flip + priority; SGDK's <code>TILE_ATTR</code> macros build it.</li>
+              <li>Scrolling is cheap and can be per-scanline; with the HBlank interrupt that yields the classic mid-screen raster effects.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#pipeline"><span class="dir">← Prev</span><span class="ttl">05 · The build &amp; header</span></a>
+            <a class="next" href="#sprites"><span class="dir">Next →</span><span class="ttl">07 · Sprites</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 07 --- -->
+      <section class="doc" id="sprites">
+        <div class="mod-head">
+          <span class="eye">Module 07 <span class="part-tag">· Part II</span></span>
+          <h3>Sprites (the SGDK sprite engine)</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Know the VDP's sprite hardware and its limits, and let SGDK's sprite engine manage animation, the sprite list and VRAM for you.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Planes are for backgrounds; <strong>sprites</strong> are for
+            everything that moves independently — the player, enemies, bullets,
+            the cursor. A VDP sprite is a small rectangle of tiles (up to 4×4,
+            i.e. 32×32 pixels) that the hardware draws at any pixel position,
+            over the planes, with its own palette line, flip and priority. The
+            VDP keeps a <strong>sprite attribute table</strong> in VRAM — a
+            linked list of up to <strong>64 sprites</strong> — and composites
+            them every frame.
+          </p>
+          <p>
+            The limits are real and worth memorising, because they shaped how
+            every Genesis game looks:
+          </p>
+          <div class="specs">
+            <div class="spec"><div class="k">Sprites total</div><div class="v">64</div><div class="d">per frame (H40 mode)</div></div>
+            <div class="spec"><div class="k">Per scanline</div><div class="v">20 <small>/ 16</small></div><div class="d">H40 / H32 — excess dropped</div></div>
+            <div class="spec"><div class="k">Pixels / line</div><div class="v">320</div><div class="d">sprite pixels per scanline (H40)</div></div>
+            <div class="spec"><div class="k">Max size</div><div class="v">32×32</div><div class="d">4×4 tiles per sprite</div></div>
+          </div>
+          <p>
+            Overrun the per-scanline budget and the VDP simply stops drawing the
+            lowest-priority sprites on that line — the notorious
+            <strong>sprite flicker</strong>. Games hid it by cycling sprite
+            priority each frame so the dropout moved around and read as
+            shimmer rather than disappearance.
+          </p>
+
+          <h4>Let SGDK do the bookkeeping</h4>
+          <p>
+            Managing the sprite list, uploading the right animation frame's
+            tiles to VRAM at the right moment, and cycling priority by hand is a
+            lot of plumbing. SGDK's <strong>sprite engine</strong> does it for
+            you: you define a <code>SpriteDefinition</code> (frames, animations,
+            collision boxes) as a resource, then create and move sprites with a
+            few calls.
+          </p>
+          <div class="code">
+            <div class="code-head">sprites from C <button class="copy" type="button">copy</button></div>
+            <pre><span class="c">// 'imgHero' comes from a SPRITE line in resources.res</span>
+<span class="fn">SPR_init</span>();                                <span class="c">// start the sprite engine</span>
+Sprite* hero = <span class="fn">SPR_addSprite</span>(&amp;imgHero, <span class="n">120</span>, <span class="n">80</span>,
+    <span class="fn">TILE_ATTR</span>(PAL2, <span class="n">0</span>, <span class="n">FALSE</span>, <span class="n">FALSE</span>));
+
+<span class="k">while</span>(<span class="n">1</span>) {
+    <span class="fn">SPR_setPosition</span>(hero, x, y);           <span class="c">// move it this frame</span>
+    <span class="fn">SPR_setAnim</span>(hero, running ? ANIM_RUN : ANIM_IDLE);
+    <span class="fn">SPR_update</span>();                          <span class="c">// rebuild the sprite list…</span>
+    <span class="fn">SYS_doVBlankProcess</span>();                 <span class="c">// …uploaded to VRAM at vblank</span>
+}</pre>
+          </div>
+          <p>
+            The engine streams only the current frame's tiles into VRAM (so a
+            big animation doesn't need all its frames resident at once), builds
+            the hardware sprite list from your logical sprites, and hands it to
+            the VDP during vblank. You think in "the hero, at (x, y), running";
+            it thinks in tiles and list entries.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Actors on a shallow stage</span>
+            <p>
+              Sprites are actors on a stage only so deep: at most 64 can be on
+              at once, and only so many can stand shoulder-to-shoulder on any one
+              line before the ones at the back get shoved off. A good director —
+              SGDK's engine, and your design — keeps the cast within budget and
+              rotates who stands where, so the audience never notices anyone was
+              ever missing.
+            </p>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A sprite is up to 32×32 pixels of tiles at any pixel position, with its own palette line, flip and priority; up to 64 per frame.</li>
+              <li>Hard limits — 20 sprites and 320 sprite-pixels per scanline (H40) — cause flicker when exceeded; priority cycling hides it.</li>
+              <li>SGDK's sprite engine manages the sprite list, VRAM streaming and animation from a resource-defined <code>SpriteDefinition</code>.</li>
+              <li>You move and animate logical sprites; <code>SPR_update()</code> + vblank push the hardware list for you.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#tiles"><span class="dir">← Prev</span><span class="ttl">06 · Tiles &amp; the VDP</span></a>
+            <a class="next" href="#sound"><span class="dir">Next →</span><span class="ttl">08 · Sound</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 08 --- -->
+      <section class="doc" id="sound">
+        <div class="mod-head">
+          <span class="eye">Module 08 <span class="part-tag">· Part II</span></span>
+          <h3>Sound: the XGM driver (FM music + PSG SFX on the Z80)</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the two sound chips and the Z80 that drives them, and use SGDK's XGM driver to play FM music and PSG effects without stealing time from your game.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The Genesis makes sound with two chips, orchestrated by a third
+            processor. The <span class="term" data-tip="Yamaha YM2612 (a.k.a. OPN2): the Genesis's FM synthesis chip. 6 channels, each with 4 operators and 8 algorithms, per-operator envelopes and a global LFO. Channel 6 can instead output raw 8-bit PCM through its DAC. ~53 kHz internal rate.">YM2612</span>
+            is an FM synthesiser — six channels, each built from four
+            <span class="term" data-tip="An operator is one sine oscillator with its own ADSR-style envelope (attack, decay, sustain, release). FM synthesis wires operators to modulate each other; the wiring is chosen by one of 8 'algorithms'.">operators</span>
+            wired together by one of eight algorithms — responsible for the
+            console's punchy basses, brass and bells. Channel 6 can instead be
+            switched to an 8-bit
+            <span class="term" data-tip="Digital-to-analog converter: channel 6 of the YM2612 can play raw 8-bit sample data (drums, voices) instead of FM, at the cost of that channel and a lot of CPU feeding it.">DAC</span>
+            to play digital drum and voice samples. Alongside it, the
+            <span class="term" data-tip="Texas Instruments SN76489 Programmable Sound Generator: 3 square-wave tone channels + 1 noise channel, each with 4-bit volume. Inherited from the Master System; the Genesis's chirps, hi-hats and UI blips.">PSG</span>
+            (an SN76489) adds three square-wave tones and a noise channel — the
+            chirps, hats and blips. Both are physically closer to the
+            <span class="term" data-tip="Zilog Z80 at 3.58 MHz with its own 8 KB RAM. On the Genesis it acts as a sound coprocessor: the 68000 can reset it or request its bus, but normally the Z80 runs a small driver that feeds the sound chips independently.">Z80</span>
+            coprocessor than to the 68000.
+          </p>
+          <p>
+            That geography is the whole reason sound is easy in SGDK. Feeding FM
+            registers in real time from the 68000 would eat your frame budget.
+            Instead, SGDK ships the <strong>XGM driver</strong>: a small program
+            that runs <em>on the Z80</em>, reading a pre-logged stream of
+            register writes and pushing them to the YM2612 and PSG on its own
+            schedule. Your 68000 code just says "play this track" or "play this
+            effect" and gets back to the game.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 220" role="img" aria-label="The Genesis sound path: the 68000 hands music and SFX commands to the XGM driver running on the Z80, which feeds the YM2612 FM chip and the SN76489 PSG">
+              <defs><marker id="ahs" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#7e8599"/></marker></defs>
+              <rect x="40" y="80" width="170" height="60" rx="10" class="d-fill-panel d-red-s" stroke-width="1.5"/>
+              <text x="125" y="106" text-anchor="middle" class="d-label" style="font-size:12.5px">68000 · your game</text>
+              <text x="125" y="126" text-anchor="middle" class="d-sub">XGM_startPlay(track)</text>
+              <line x1="210" y1="110" x2="290" y2="110" class="d-axis" stroke-width="1.8" marker-end="url(#ahs)"/>
+              <rect x="295" y="70" width="190" height="80" rx="10" class="d-fill-panel d-blue-s" stroke-width="1.6"/>
+              <text x="390" y="98" text-anchor="middle" class="d-label" style="font-size:12.5px">Z80 · XGM driver</text>
+              <text x="390" y="118" text-anchor="middle" class="d-sub">8 KB RAM · streams</text>
+              <text x="390" y="134" text-anchor="middle" class="d-sub">register writes on its own clock</text>
+              <line x1="485" y1="98" x2="565" y2="86" class="d-axis" stroke-width="1.8" marker-end="url(#ahs)"/>
+              <line x1="485" y1="128" x2="565" y2="150" class="d-axis" stroke-width="1.8" marker-end="url(#ahs)"/>
+              <rect x="570" y="58" width="290" height="52" rx="9" class="d-fill-panel2 d-gold-s" stroke-width="1.4"/>
+              <text x="715" y="80" text-anchor="middle" class="d-label" style="font-size:12.5px">YM2612 (FM)</text>
+              <text x="715" y="99" text-anchor="middle" class="d-sub">6 channels · 4 operators · ch6 DAC</text>
+              <rect x="570" y="120" width="290" height="52" rx="9" class="d-fill-panel2 d-gold-s" stroke-width="1.4"/>
+              <text x="715" y="142" text-anchor="middle" class="d-label" style="font-size:12.5px">SN76489 (PSG)</text>
+              <text x="715" y="161" text-anchor="middle" class="d-sub">3 square tones + 1 noise · 4-bit volume</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The sound path.</strong> Your 68000 code issues one command; the XGM driver on the Z80 does the per-tick work of feeding the two chips. Music (FM, often with sampled drums on channel 6's DAC) and sound effects (typically PSG) mix without stealing measurable time from your game loop.</figcaption>
+          </figure>
+
+          <h4>In practice</h4>
+          <div class="code">
+            <div class="code-head">sound from C <button class="copy" type="button">copy</button></div>
+            <pre><span class="c">// 'music' (an XGM track) and 'sfxJump' (a PCM/effect) come from resources.res</span>
+<span class="fn">XGM_startPlay</span>(music);              <span class="c">// start the FM/PSG music, looping</span>
+...
+<span class="k">if</span> (<span class="fn">JOY_readJoypad</span>(JOY_1) &amp; BUTTON_A)
+    <span class="fn">XGM_startPlayPCM</span>(sfxJump, <span class="n">1</span>, SOUND_PCM_CH2);   <span class="c">// fire a sound effect</span></pre>
+          </div>
+          <p>
+            You list music and effects in <code>resources.res</code>;
+            <code>rescomp</code> converts a <code>.vgm</code> or tracker export
+            into the driver's compact format at build time. From C it's a
+            handful of <code>XGM_*</code> calls. (There is a newer XGM2 driver in
+            recent SGDK with more PCM channels and lower CPU cost; the shape of
+            the API is the same.)
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Handing the band a setlist</span>
+            <p>
+              You are the bandleader, but you don't play the instruments. You
+              hand the band (the Z80 running XGM) a setlist and the sheet music,
+              and they perform it on the YM2612 and PSG while you run the rest of
+              the show. Calling <code>XGM_startPlay</code> is nodding to the
+              drummer to start the next number — one gesture, and you're free to
+              do your own job.
+            </p>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Two chips: the YM2612 (6-channel FM, ch6 doubles as an 8-bit PCM DAC) and the SN76489 PSG (3 tones + noise).</li>
+              <li>The Z80 coprocessor drives them; SGDK's XGM driver runs there and streams register writes so the 68000 stays free.</li>
+              <li>From C you list tracks/effects in <code>resources.res</code> and trigger them with a few <code>XGM_*</code> calls.</li>
+              <li>Music is typically FM with sampled drums; sound effects are often PSG or short PCM — mixed without hurting your frame budget.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#sprites"><span class="dir">← Prev</span><span class="ttl">07 · Sprites</span></a>
+            <a class="next" href="#input"><span class="dir">Next →</span><span class="ttl">09 · Reading the controller</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 09 --- -->
+      <section class="doc" id="input">
+        <div class="mod-head">
+          <span class="eye">Module 09 <span class="part-tag">· Part II</span></span>
+          <h3>Reading the controller</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Master the joypad: the scan-per-frame model, the button bitmask, the 3-button vs 6-button pad, and edge-versus-level reads.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Controller input on the Genesis is refreshingly honest. There are no
+            events, no callbacks, no queues. Once per frame SGDK reads the pads
+            for you; you ask <strong><code>JOY_readJoypad(JOY_1)</code></strong>
+            for a bitmask of what's currently held on controller 1, and test
+            bits with a bitwise AND. Under the hood, that mask comes from the
+            controller port at <strong><code>0xA10003</code></strong> in the
+            68000's address space.
+          </p>
+          <p>
+            The original <strong>3-button pad</strong> has a D-pad and four
+            buttons: <strong>A B C</strong> and <strong>START</strong>. Reading
+            it is almost trivial — but the port only exposes six lines at once,
+            so the console reads the pad twice per frame, toggling a select line
+            (<span class="term" data-tip="One output bit of the controller port (the TH line). Its level selects which half of the pad's buttons appear on the six data lines. The 3-button pad needs two reads per frame; the 6-button pad uses rapid toggling to expose a third and fourth set.">TH</span>)
+            to get the D-pad on one read and the buttons on the other.
+          </p>
+          <p>
+            The <strong>6-button pad</strong> adds <strong>X Y Z</strong> and
+            <strong>MODE</strong>. It's backward-compatible: read it the simple
+            way and you get A B C START as before. To reach the extra buttons,
+            software toggles the select line several times in quick succession
+            and the pad reveals additional banks — a little handshake SGDK
+            performs for you. Your code just sees more bits set in the same
+            mask. (There's a historical gotcha: MODE was designed partly so a
+            game could detect the 6-button pad, since some older titles
+            mis-read it; if you support 6-button, test it deliberately.)
+          </p>
+          <p>
+            Each button owns one bit, with SGDK names like
+            <code>BUTTON_A</code> (0x0040), <code>BUTTON_START</code> (0x0080),
+            <code>BUTTON_X</code> (0x0400) and <code>BUTTON_MODE</code>
+            (0x0800). The lab shows the live mask: drive the drawn pad with your
+            keyboard (or plug in any USB gamepad — the browser's Gamepad API
+            stands in for the console's port) and watch bits flip. Toggle
+            between 3- and 6-button to see the extra bank light up.
+          </p>
+
+          <div class="lab" id="lab-pad">
+            <div class="lab-head"><span class="dot"></span><span class="title">Controller lab — the live JOY_readJoypad mask</span><span class="badge">Canvas · interactive</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-pad" aria-label="A drawn Genesis controller whose buttons light up from keyboard or gamepad input"></canvas>
+              <div class="pad-wrap">
+                <div class="controls">
+                  <div class="ctrl">
+                    <label>pad type</label>
+                    <div class="seg-btns" data-pad-mode role="group" aria-label="Pad type">
+                      <button class="on" type="button">3-button</button>
+                      <button type="button">6-button</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="pad-keys" aria-label="Keyboard mapping">
+                  <span class="lbl">keys ·</span>
+                  <span class="kbd">←↑↓→</span><span class="lbl">D-pad</span>
+                  <span class="kbd">A</span><span class="lbl">A</span>
+                  <span class="kbd">S</span><span class="lbl">B</span>
+                  <span class="kbd">D</span><span class="lbl">C</span>
+                  <span class="kbd">↵</span><span class="lbl">START</span>
+                  <span class="kbd">Z</span><span class="lbl">X</span>
+                  <span class="kbd">X</span><span class="lbl">Y</span>
+                  <span class="kbd">C</span><span class="lbl">Z</span>
+                  <span class="kbd">V</span><span class="lbl">MODE</span>
+                </div>
+                <div class="readouts">
+                  <span class="readout">JOY_readJoypad(JOY_1) <b data-pad-mask>0x000</b></span>
+                  <span class="readout">binary <b data-pad-bin>00000000</b></span>
+                </div>
+                <div class="readouts">
+                  <span class="readout" style="max-width:100%"><b data-pad-names>0 (nothing held)</b></span>
+                </div>
+              </div>
+              <span class="sim-note">X, Y, Z and MODE only respond in 6-button mode — exactly like the real handshake. A USB gamepad works too (press a button to wake the Gamepad API). The bit values shown are SGDK's real <code>BUTTON_*</code> constants.</span>
+            </div>
+          </div>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The photograph, not the doorbell</span>
+            <p>
+              Desktop input is a doorbell: events ring whenever they please and
+              you answer. Console input is a photograph: once per frame you take
+              one picture of every button, and for the next 16.7 milliseconds you
+              reason about that frozen picture. Comparing this photo with the
+              previous one is how "held" becomes "just pressed" — the edge is
+              literally the difference between two snapshots, and using
+              <em>held</em> where you meant the <em>edge</em> is the classic
+              menu-flickers-past-five-options bug.
+            </p>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Read the pad once per frame; <code>JOY_readJoypad(JOY_1)</code> returns a bitmask you test with bitwise AND. The hardware port is <code>0xA10003</code>.</li>
+              <li>3-button pad: UP DOWN LEFT RIGHT A B C START. 6-button adds X Y Z MODE via a select-line handshake SGDK performs for you.</li>
+              <li>Each button is one bit (<code>BUTTON_A</code> = 0x0040, <code>BUTTON_MODE</code> = 0x0800, …); the extra bank only appears on a 6-button read.</li>
+              <li>Held = level (continuous), the change between frames = edge (discrete). Input is stage one of Module 10's loop.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#sound"><span class="dir">← Prev</span><span class="ttl">08 · Sound</span></a>
+            <a class="next" href="#loop"><span class="dir">Next →</span><span class="ttl">10 · The 60 Hz game loop</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 10 --- -->
+      <section class="doc" id="loop">
+        <div class="mod-head">
+          <span class="eye">Module 10 <span class="part-tag">· Part II</span></span>
+          <h3>The 60 Hz game loop</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Internalise the read → update → draw → vblank loop, the 16.7-millisecond budget it must fit in, and what missing that budget looks and feels like.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Every module so far has been a part; this is the whole. A Genesis
+            game — yours, or any retail cartridge ever pressed — is one loop:
+          </p>
+
+          <div class="code">
+            <div class="code-head">the canonical loop <button class="copy" type="button">copy</button></div>
+            <pre><span class="k">while</span> (<span class="n">1</span>) {
+    u16 pad = <span class="fn">JOY_readJoypad</span>(JOY_1);   <span class="c">// 1 · snapshot the player's hands</span>
+    <span class="fn">update_world</span>(pad);                 <span class="c">// 2 · physics, AI, rules — pure computation</span>
+    <span class="fn">draw_world</span>();                     <span class="c">// 3 · queue VDP writes &amp; sprite updates</span>
+    <span class="fn">SYS_doVBlankProcess</span>();            <span class="c">// 4 · block until vblank, then flush to VRAM</span>
+}</pre>
+          </div>
+
+          <p>
+            Step 4 is the one with teeth. The VDP scans a full frame to the TV
+            every <strong>16.7&nbsp;ms</strong> (NTSC 60&nbsp;Hz; 20&nbsp;ms on
+            PAL 50&nbsp;Hz), and <code>SYS_doVBlankProcess()</code> blocks until
+            the
+            <span class="term" data-tip="The vertical-blank interrupt fires once per frame when the VDP finishes drawing. It's the only safe window to push large amounts of data to VRAM, and the clock every game synchronises to.">VBlank interrupt</span>
+            arrives — and only during that brief blanking window is it safe to
+            push a lot of data into VRAM (draw outside it and you fight the beam
+            for the bus). So the loop runs at exactly 60&nbsp;Hz — <em>if</em>
+            steps 1–3 fit inside the budget. Spend 10&nbsp;ms computing, wait
+            6.7: sixty perfect frames. Spend 17&nbsp;ms — one millisecond over —
+            and you don't get 59 frames: you <strong>miss the vblank</strong>,
+            wait for the <em>next</em> one, and drop to 30&nbsp;Hz. The budget
+            isn't a speed limit you can nudge past; it's a train that leaves the
+            station with or without you.
+          </p>
+          <p>
+            Two facts make console timing a gift instead of a terror. First, the
+            VDP <strong>double-buffers for you conceptually</strong>: you build
+            the next frame's changes during the visible portion and commit them
+            in the vblank window, so the screen never shows a half-updated frame.
+            Second, exploit the machine's <strong>determinism</strong>. There is
+            no OS, no other process, no thermal throttling, no surprise
+            background update: the same code path costs the same 68000 cycles
+            every single time. If your frame fits today, it fits forever. This is
+            why 1990 games could promise a rock-solid 60 and keep the promise.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Live television</span>
+            <p>
+              A game loop is a live TV broadcast: a new frame goes to air every
+              16.7 ms whether you're ready or not. A studio show rehearses until
+              every segment fits its slot exactly — that's the determinism. Miss
+              your slot and you don't air 4% late; you wait for the next slot
+              while the audience watches a repeat. That's the drop to 30 Hz, and
+              viewers feel it instantly.
+            </p>
+          </div>
+
+          <p>
+            The lab makes the budget physical. It's a tiny playable game — move
+            the paddle with ←/→, A/D or the mouse — whose loop presents one frame
+            per vblank, exactly like the code above. The slider adds simulated
+            work to steps 2–3. Push it past the 16.7&nbsp;ms line and watch the
+            game snap from silk to judder: same game, one millisecond too greedy.
+          </p>
+
+          <div class="lab" id="lab-loop">
+            <div class="lab-head"><span class="dot"></span><span class="title">Frame-budget lab — a playable loop you can overload</span><span class="badge">Canvas · playable</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-tall" aria-label="A small paddle game with a frame-time meter; a slider adds work per frame until the game misses vblanks"></canvas>
+              <div class="controls">
+                <div class="ctrl" style="min-width:220px">
+                  <label>work per frame — <span class="val" data-loop-work-val>6 ms</span></label>
+                  <input type="range" min="2" max="40" value="6" step="1" data-loop-work aria-label="Simulated work per frame in milliseconds">
+                </div>
+                <div class="readouts">
+                  <span class="readout">presenting <b data-loop-fps>60 fps</b></span>
+                  <span class="readout">missed vblanks <b data-loop-missed>0</b></span>
+                  <span class="readout">score <b data-loop-score>0</b></span>
+                </div>
+                <span class="sim-note">←/→, A/D or mouse to move. The meter along the bottom is your frame time against the 16.7 ms NTSC budget: green fits, red misses — and the instant it crosses the line, 60 Hz becomes 30. There is no 45.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The loop is read → update → draw → vblank; the VDP's 60 Hz (NTSC) / 50 Hz (PAL) frame rate is the clock and the contract.</li>
+              <li>Overrun the 16.7 ms budget by any amount and you wait a whole extra frame: rates quantise (60 → 30), they don't degrade smoothly.</li>
+              <li>The vblank window is the safe time to push VRAM; <code>SYS_doVBlankProcess()</code> is where SGDK commits your frame.</li>
+              <li>Bare metal is deterministic: a frame that fits once fits always. Budget once, trust it forever.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#input"><span class="dir">← Prev</span><span class="ttl">09 · Reading the controller</span></a>
+            <a class="next" href="#blastem"><span class="dir">Next →</span><span class="ttl">11 · Running in BlastEm</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART C ============== -->
+      <section class="part" id="part-c">
+        <div class="part-inner">
+          <div class="kicker">Part III</div>
+          <h3>Running it</h3>
+          <p>
+            A game nobody can run is a diary. The final stretch establishes the
+            fast development loop in BlastEm, walks the path to a real console
+            through a flashcart, and points you at where to go once the course
+            lets go of your hand.
+          </p>
+          <div class="part-meta"><span>Modules <b>11–13</b></span><span>Difficulty <b>Easy reading</b></span><span>Mood <b>ship it</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 11 --- -->
+      <section class="doc" id="blastem">
+        <div class="mod-head">
+          <span class="eye">Module 11 <span class="part-tag">· Part III</span></span>
+          <h3>Running in BlastEm</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Make an emulator your development console: the seconds-long build-run loop, symbol debugging, and why an accuracy-focused emulator is the right rehearsal room.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            <strong>BlastEm is your development console.</strong> It opens your
+            <code>rom.bin</code> directly — drag the file onto it, or pass it on
+            the command line — and your program boots in a window a second after
+            <code>make</code> finishes. This tight loop is something 1990-era
+            licensed developers, burning EPROMs to test each build, would have
+            envied.
+          </p>
+          <p>
+            BlastEm is a good choice for two reasons. It is
+            <strong>accuracy-focused</strong>: its 68000, VDP and timing models
+            are careful enough that code which behaves in BlastEm almost always
+            behaves on hardware — the opposite of developing against a
+            forgiving emulator and discovering your timing was luck. And it has a
+            built-in <strong>debugger</strong>: a console where you set
+            breakpoints, step 68000 instructions, inspect registers and memory,
+            and watch VDP state. Point it at the <code>rom.out</code> ELF and it
+            can use your symbols, so you break on <code>update_world</code>
+            rather than a bare address.
+          </p>
+          <ul>
+            <li><strong>Debug with symbols.</strong> Load the ELF; the debugger shows function and variable names — the CPU course's Part III, now aimed at <em>your</em> code.</li>
+            <li><strong>Watch the VDP.</strong> BlastEm can show plane and VRAM state, so "why is my sprite invisible" becomes a thing you can see, not guess.</li>
+            <li><strong>Map a controller.</strong> Keyboard or any USB gamepad stands in for a Genesis pad — Module 09's lab is exactly what your ROM reads.</li>
+          </ul>
+
+          <div class="note hw">
+            <span class="ico">◆</span>
+            <p>
+              Keep a second emulator around for cross-checking:
+              <strong>Genesis Plus GX</strong> is another accurate, widely used
+              open-source core (you'll meet it as a RetroArch core and in
+              standalone builds). Its
+              <span class="term" data-tip="Nuked-OPN2: a cycle-accurate software model of the YM2612 derived from a die scan of the real chip. Several emulators use it for faithful FM sound.">Nuked-OPN2</span>
+              FM model reproduces the YM2612 faithfully, which matters the moment
+              your music relies on the chip's real quirks. If your ROM works in
+              both BlastEm and Genesis Plus GX, it is very likely correct.
+            </p>
+          </div>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The dress rehearsal and the opening night</span>
+            <p>
+              BlastEm is the rehearsal studio: mirrors on every wall (the
+              debugger), stop-and-repeat any scene (savestates), no audience.
+              Real hardware (Module 12) is opening night — same script, but now
+              the CRT is real and the timing is merciless. Rehearse in the studio
+              daily; go to the theatre to be sure the show works under stage
+              lights. An <em>accurate</em> studio is what makes opening night
+              boring in the best way.
+            </p>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>BlastEm opens <code>rom.bin</code> directly — the edit-compile-test loop is seconds long.</li>
+              <li>Its accuracy means "works here" strongly predicts "works on hardware"; its debugger + your ELF symbols give real breakpoints.</li>
+              <li>Cross-check in Genesis Plus GX (with Nuked-OPN2 for faithful FM) to catch anything one emulator forgives.</li>
+              <li>Develop against accuracy, not leniency — it saves you the worst kind of bug, the one only real hardware shows.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#loop"><span class="dir">← Prev</span><span class="ttl">10 · The 60 Hz loop</span></a>
+            <a class="next" href="#hardware"><span class="dir">Next →</span><span class="ttl">12 · On real hardware</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 12 --- -->
+      <section class="doc" id="hardware">
+        <div class="mod-head">
+          <span class="eye">Module 12 <span class="part-tag">· Part III</span></span>
+          <h3>On real hardware (Mega EverDrive &amp; other flashcarts)</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Get your ROM onto a real Genesis through a flashcart, and understand the small real-world gotchas — region, 50/60 Hz, and TMSS — that emulators hide.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Sooner or later you'll want the real thing: your tiles on a real VDP,
+            through a real CRT. Because the Genesis never locked its cartridge
+            slot, getting there is delightfully simple — no exploits, no soldering
+            for the common path. You need a <strong>flashcart</strong>: a
+            cartridge with an SD-card slot and rewritable memory that presents
+            your ROM to the console as if it were a mask ROM.
+          </p>
+
+          <div class="routes">
+            <div class="route">
+              <span class="tag">no console needed</span>
+              <h5>BlastEm / Genesis Plus GX</h5>
+              <p>Open <code>rom.bin</code> directly. Instant, free, with a debugger. Where all development happens regardless of what you own (Module 11).</p>
+              <div class="need"><span>needs ·</span> just your PC</div>
+            </div>
+            <div class="route">
+              <span class="tag hw">the standard kit</span>
+              <h5>Mega EverDrive</h5>
+              <p>Krikzz's flashcart line (Mega EverDrive Pro / X7 / X3). Copy <code>rom.bin</code> to the SD card, insert the cart, power on, pick your ROM from its menu. The de-facto homebrew testing cartridge.</p>
+              <div class="need"><span>needs ·</span> console + Mega EverDrive + SD card</div>
+            </div>
+            <div class="route">
+              <span class="tag hw">alternatives</span>
+              <h5>Other flashcarts</h5>
+              <p>The Mega SD (Terraonion) and various community/clone carts do the same job — SD in, ROM on the console. Any reputable Genesis flashcart runs your <code>.bin</code> unchanged.</p>
+              <div class="need"><span>needs ·</span> console + a flashcart + SD card</div>
+            </div>
+            <div class="route">
+              <span class="tag old">the deep end</span>
+              <h5>Burn an EPROM</h5>
+              <p>The old-school route: flash your ROM to an EPROM, wire it into a donor cartridge board. Educational and permanent, but a flashcart is far easier for day-to-day testing.</p>
+              <div class="need"><span>needs ·</span> an EPROM programmer &amp; a donor board</div>
+            </div>
+          </div>
+
+          <h4>The small gotchas emulators hide</h4>
+          <ul>
+            <li><strong>Region &amp; refresh.</strong> A Japanese or US console runs NTSC at 60&nbsp;Hz; a European one runs PAL at 50&nbsp;Hz with 240 visible lines instead of 224. If you assumed 60&nbsp;Hz timing, a PAL machine runs your game ~17% slower. SGDK exposes the detected region; budget and pace against it, and test on the hardware you care about.</li>
+            <li><strong>TMSS.</strong> Later consoles check the header's "SEGA" signature and require the ROM to write "SEGA" to a register at boot. SGDK's startup does both, so a stock SGDK ROM passes — but it's the reason you can't just dump arbitrary bytes at address 0 and expect a boot.</li>
+            <li><strong>Real timing bites.</strong> Effects that "worked" in a lenient emulator — squeezing too much into vblank, racing the beam — can glitch on hardware. This is exactly why Module 11 argued for an accurate emulator: the gap between studio and stage should be as small as you can make it.</li>
+          </ul>
+
+          <div class="note warn">
+            <span class="ico">⚠</span>
+            <p>
+              The bright line, one last time: put <em>your own software</em> on
+              the flashcart. The scene runs on people sharing homebrew ROMs they
+              wrote; it does not need — and this course does not touch — copying
+              commercial cartridges. A flashcart loaded with your own
+              <code>rom.bin</code> is the clean, intended use.
+            </p>
+          </div>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The rewritable disc</span>
+            <p>
+              A mask-ROM cartridge is a pressed vinyl record: made once at a
+              factory, unchangeable. A flashcart is a rewritable disc in the same
+              sleeve — the turntable (the console) can't tell the difference and
+              plays it just the same, but you can burn a new track any time your
+              build changes. That's the whole magic: the console asks no
+              questions about who cut the record.
+            </p>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A flashcart (Mega EverDrive and friends) loads your <code>rom.bin</code> from SD onto a real Genesis — no exploit, no signing.</li>
+              <li>Region matters: NTSC 60 Hz / 224 lines vs PAL 50 Hz / 240 lines changes your timing and layout — detect and adapt.</li>
+              <li>TMSS is satisfied automatically by SGDK's startup (the "SEGA" header + register write).</li>
+              <li>Test on real hardware to catch timing effects an emulator may forgive; ship only your own ROMs.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#blastem"><span class="dir">← Prev</span><span class="ttl">11 · Running in BlastEm</span></a>
+            <a class="next" href="#next"><span class="dir">Next →</span><span class="ttl">13 · Where to go next</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 13 --- -->
+      <section class="doc" id="next">
+        <div class="mod-head">
+          <span class="eye">Module 13 <span class="part-tag">· Part III</span></span>
+          <h3>Where to go next</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Close the collection's loop: see the whole path from your keyboard to the scanline, collect the best next steps, and go build something.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Here is the entire course in one chain. Trace it once with your
+            finger; every link is now something you've either studied or built:
+          </p>
+          <div class="pipe">
+            <div class="stage"><div class="t">main.c · .res</div><div class="d">your idea, in C <span style="color:var(--muted)">(04)</span></div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">m68k-elf-gcc</div><div class="d">cross-compiled + SGDK <span style="color:var(--muted)">(02–05)</span></div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">rom.bin</div><div class="d">a real cartridge image <span style="color:var(--muted)">(05)</span></div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">BlastEm / flashcart</div><div class="d">loaded &amp; run <span style="color:var(--muted)">(11–12)</span></div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t">the machine</div><div class="d">68000 · VDP · Z80 · your loop <span style="color:var(--muted)">(06–10)</span></div></div>
+          </div>
+          <p>
+            When the first module of any course in this collection began, the
+            Genesis was a sealed appliance. Somewhere in the middle it became a
+            diagram. If this course did its job, it is now something better: a
+            <strong>target</strong>. The 68000 whose registers you studied
+            executes your opcodes. The VDP planes you toggled in a lab scroll
+            your tiles. The YM2612 plays your music; the vblank you learned to
+            fear and love paces your loop. There is no layer of the machine left
+            that is someone else's business.
+          </p>
+
+          <h4>Where to go from here</h4>
+          <ul>
+            <li><strong>Mine the samples.</strong> SGDK's <code>sample/</code> tree has a working project for nearly every subsystem — the fastest way to learn an API is to build its example and start bending it.</li>
+            <li><strong>Read the source.</strong> SGDK is open; <code>libmd</code>'s VDP, sprite and sound code is a readable master-class in driving the hardware you studied.</li>
+            <li><strong>Use BlastEm as a microscope.</strong> Its debugger and VDP views (Module 11) are as good at inspecting <em>your</em> game as anyone else's.</li>
+            <li><strong>Join the room.</strong> The SGDK community (its GitHub, the Spritesmind forums, and active Discords) has answered every beginner question many times over. Ask well: post code, name your SGDK version.</li>
+            <li><strong>Revisit the other courses as manuals.</strong> They were written as teardowns — <a href="../cpu/">68000</a>, <a href="../vdp/">VDP</a>, <a href="../audio/">audio</a>, <a href="../z80/">Z80</a> — but each reads differently now that the hardware is yours to command.</li>
+          </ul>
+
+          <p>
+            A good first project, if you want one: a one-screen arcade game —
+            paddle, ball, score, one FM music track, one PSG sound effect. It
+            touches every module of this course, fits comfortably in the frame
+            budget, packs into a single <code>rom.bin</code>, and it is exactly
+            the kind of thing the scene has cherished for decades: proof that a
+            1988 machine still says yes to anyone who learns to ask.
+          </p>
+
+          <div class="takeaway">
+            <div class="th">Course complete ✦</div>
+            <ul>
+              <li>You can set up SGDK on Windows, macOS or Linux, and explain every piece of the toolchain.</li>
+              <li>You can read a Genesis ROM header byte by byte, and narrate the pipeline that produced it.</li>
+              <li>You can put text, tiles, sprites and FM/PSG sound on screen, read the pad, and pace a 60 Hz loop.</li>
+              <li>You can run your ROM in BlastEm and on a real console via a flashcart. The other courses taught you the machine. This one made it yours.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#hardware"><span class="dir">← Prev</span><span class="ttl">12 · On real hardware</span></a>
+            <a class="next" href="#what"><span class="dir">↺ Restart</span><span class="ttl">01 · What homebrew is</span></a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <p>
+          Part of the <a href="../">Inside the Sega Genesis</a> collection.
+          Every screen, controller and build on this page is a synthetic browser
+          simulation; the page ships <strong>no Sega code, tools or assets</strong>,
+          the boot screen is a generic stand-in (never Sega's logo or jingle),
+          and neither the page nor the toolchain it teaches contains any Sega
+          material. Toolchain facts follow the public SGDK project and the
+          open-source emulators <a href="https://github.com/Stephane-Dallongeville/SGDK">SGDK</a>,
+          <a href="https://www.retrodev.com/blastem/">BlastEm</a>,
+          Genesis Plus GX and Nuked-OPN2; installer and product details drift
+          over time, so where this page and SGDK's README disagree, trust the
+          README. "Sega", "Genesis" and "Mega Drive" are trademarks of Sega;
+          this is an independent, non-commercial educational project with no
+          affiliation. Homebrew described here means running your own software on
+          hardware you own — this page neither contains nor endorses tools for
+          copying games.
+        </p>
+        <p class="src">
+          Source of truth · <code>github.com/Stephane-Dallongeville/SGDK</code> ·
+          <code>retrodev.com/blastem</code> ·
+          <code>github.com/ekeeke/Genesis-Plus-GX</code>
+        </p>
+      </footer>
+
+    </div><!-- /wrap -->
+  </main>
+</div><!-- /app -->
+
+<script src="app.js"></script>
+</body>
+</html>
